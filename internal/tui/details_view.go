@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -56,7 +55,7 @@ func (a *App) buildDetailsView() *tview.Flex {
 		SetTitle(" Details ").
 		SetTitleColor(a.theme.Foreground).
 		SetBorderColor(a.theme.Border).
-		SetBackgroundColor(tcell.ColorDefault)
+		SetBackgroundColor(a.theme.Background)
 	padding := a.density.DetailsPadding
 	a.detailsDescriptionView.SetBorderPadding(padding.Top, padding.Bottom, padding.Left, padding.Right)
 
@@ -69,11 +68,12 @@ func (a *App) buildDetailsView() *tview.Flex {
 		SetTitle(" Comments ").
 		SetTitleColor(a.theme.Foreground).
 		SetBorderColor(a.theme.Border).
-		SetBackgroundColor(tcell.ColorDefault)
+		SetBackgroundColor(a.theme.Background)
 	a.detailsCommentsView.SetBorderPadding(padding.Top, padding.Bottom, padding.Left, padding.Right)
 
 	// Create flex layout; comments are added conditionally after issue selection.
 	detailsFlex := tview.NewFlex().SetDirection(tview.FlexRow)
+	detailsFlex.SetBackgroundColor(a.theme.Background)
 	a.detailsView = detailsFlex
 	a.setDetailsCommentsVisibility(false)
 

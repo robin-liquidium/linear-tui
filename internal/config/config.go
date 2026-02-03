@@ -87,6 +87,14 @@ type Config struct {
 
 	// AgentWorkspace is the default workspace path for agent runs.
 	AgentWorkspace string
+
+	// IncludeCompleted controls whether completed/canceled issues are included.
+	IncludeCompleted bool
+
+	// Panel visibility preferences.
+	ShowNavigation  bool
+	ShowMyIssues    bool
+	ShowOtherIssues bool
 }
 
 // LoadFromEnv loads configuration from environment variables.
@@ -99,19 +107,23 @@ func LoadFromEnv() (Config, error) {
 	}
 
 	cfg := Config{
-		LinearAPIKey:   apiKey,
-		APIEndpoint:    DefaultAPIEndpoint,
-		Timeout:        DefaultTimeout,
-		PageSize:       DefaultPageSize,
-		CacheTTL:       DefaultCacheTTL,
-		LogFile:        getDefaultLogFile(), // Default: $HOME/.linear-tui/app.log
-		LogLevel:       DefaultLogLevel,
-		Theme:          DefaultTheme,
-		Density:        DefaultDensity,
-		AgentProvider:  DefaultAgentProvider,
-		AgentSandbox:   DefaultAgentSandbox,
-		AgentModel:     "",
-		AgentWorkspace: "",
+		LinearAPIKey:     apiKey,
+		APIEndpoint:      DefaultAPIEndpoint,
+		Timeout:          DefaultTimeout,
+		PageSize:         DefaultPageSize,
+		CacheTTL:         DefaultCacheTTL,
+		LogFile:          getDefaultLogFile(), // Default: $HOME/.linear-tui/app.log
+		LogLevel:         DefaultLogLevel,
+		Theme:            DefaultTheme,
+		Density:          DefaultDensity,
+		AgentProvider:    DefaultAgentProvider,
+		AgentSandbox:     DefaultAgentSandbox,
+		AgentModel:       "",
+		AgentWorkspace:   "",
+		IncludeCompleted: false,
+		ShowNavigation:   true,
+		ShowMyIssues:     true,
+		ShowOtherIssues:  true,
 	}
 
 	// Parse optional API endpoint override.

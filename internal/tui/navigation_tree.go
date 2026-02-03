@@ -6,15 +6,18 @@ import (
 
 // NavigationNode represents a node in the navigation tree.
 type NavigationNode struct {
-	ID        string
-	Text      string
-	TeamID    string // For team, project, and status nodes
-	Children  []*NavigationNode
-	IsTeam    bool
-	IsProject bool
-	IsStatus  bool
-	StateID   string
-	StateName string
+	ID              string
+	Text            string
+	TeamID          string // For team, project, and status nodes
+	Children        []*NavigationNode
+	IsTeam          bool
+	IsProject       bool
+	IsStatus        bool
+	StateID         string
+	StateName       string
+	IsCustomView    bool
+	CustomViewID    string
+	IsCustomViewAdd bool
 }
 
 // buildNavigationTree creates and configures the navigation tree widget.

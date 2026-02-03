@@ -176,6 +176,62 @@ func DefaultCommands(app *App) []Command {
 			},
 		},
 		{
+			ID:       "add_custom_view",
+			Title:    "Add custom view",
+			Keywords: []string{"custom", "view", "add", "filter"},
+			Run: func(a *App) {
+				a.ShowCustomViewModal(nil)
+			},
+		},
+		{
+			ID:       "edit_custom_view",
+			Title:    "Edit custom view",
+			Keywords: []string{"custom", "view", "edit", "rename"},
+			Run: func(a *App) {
+				if a.selectedCustomView == nil {
+					a.updateStatusBarWithError(fmt.Errorf("no custom view selected"))
+					return
+				}
+				a.ShowCustomViewModal(a.selectedCustomView)
+			},
+		},
+		{
+			ID:       "delete_custom_view",
+			Title:    "Delete custom view",
+			Keywords: []string{"custom", "view", "delete", "remove"},
+			Run: func(a *App) {
+				if a.selectedCustomView == nil {
+					a.updateStatusBarWithError(fmt.Errorf("no custom view selected"))
+					return
+				}
+				a.confirmDeleteView(*a.selectedCustomView)
+			},
+		},
+		{
+			ID:       "toggle_navigation_panel",
+			Title:    "Toggle navigation panel",
+			Keywords: []string{"toggle", "panel", "navigation", "left"},
+			Run: func(a *App) {
+				a.toggleNavigationPanel()
+			},
+		},
+		{
+			ID:       "toggle_my_issues_panel",
+			Title:    "Toggle my issues panel",
+			Keywords: []string{"toggle", "panel", "my issues"},
+			Run: func(a *App) {
+				a.toggleMyIssuesPanel()
+			},
+		},
+		{
+			ID:       "toggle_other_issues_panel",
+			Title:    "Toggle other issues panel",
+			Keywords: []string{"toggle", "panel", "other issues"},
+			Run: func(a *App) {
+				a.toggleOtherIssuesPanel()
+			},
+		},
+		{
 			ID:       "edit_prompt_templates",
 			Title:    "Edit agent prompt templates",
 			Keywords: []string{"agent", "prompt", "prompts", "template", "templates"},
@@ -349,7 +405,11 @@ func DefaultCommands(app *App) []Command {
 				if issue == nil {
 					return
 				}
-				a.ShowStatusPicker(func(stateID string) {
+				teamID := issue.TeamID
+				if teamID == "" {
+					teamID = a.GetSelectedTeamID()
+				}
+				a.ShowStatusPicker(teamID, func(stateID string) {
 					go func() {
 						ctx := context.Background()
 						_, err := a.GetAPI().UpdateIssue(ctx, linearapi.UpdateIssueInput{
@@ -363,6 +423,41 @@ func DefaultCommands(app *App) []Command {
 								return
 							}
 							logger.Info("tui.commands: changed status issue=%s", issue.Identifier)
+							if a.shouldHideIssueAfterStateChange(*issue, stateID) {
+								a.removeIssueFromList(issue.ID)
+								go a.refreshIssuesWithFocusChange(false)
+								return
+							}
+							go a.refreshIssues(issue.ID)
+						})
+					}()
+				})
+			},
+		},
+		{
+			ID:           "change_priority",
+			Title:        "Change priority",
+			Keywords:     []string{"priority", "prio", "urgent", "high", "low"},
+			ShortcutRune: 'p',
+			Run: func(a *App) {
+				issue := a.GetSelectedIssue()
+				if issue == nil {
+					return
+				}
+				a.ShowPriorityPicker(func(priority int) {
+					go func() {
+						ctx := context.Background()
+						_, err := a.GetAPI().UpdateIssue(ctx, linearapi.UpdateIssueInput{
+							ID:       issue.ID,
+							Priority: &priority,
+						})
+						a.QueueUpdateDraw(func() {
+							if err != nil {
+								logger.ErrorWithErr(err, "tui.commands: failed to change priority issue=%s", issue.Identifier)
+								a.updateStatusBarWithError(err)
+								return
+							}
+							logger.Info("tui.commands: changed priority issue=%s", issue.Identifier)
 							go a.refreshIssues(issue.ID)
 						})
 					}()

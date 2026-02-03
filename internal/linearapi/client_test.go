@@ -477,6 +477,28 @@ func TestBuildBaseIssueFilter(t *testing.T) {
 				"state":   map[string]interface{}{"id": map[string]interface{}{"eq": "state-2"}},
 			},
 		},
+		{
+			name: "assignee label due filters",
+			params: FetchIssuesParams{
+				AssigneeID:    "user-1",
+				LabelID:       "label-1",
+				DueWithinDays: 5,
+			},
+			want: IssueFilter{
+				"assignee": map[string]interface{}{"id": map[string]interface{}{"eq": "user-1"}},
+				"labels":   map[string]interface{}{"id": map[string]interface{}{"eq": "label-1"}},
+				"dueDate":  map[string]interface{}{"lt": "P5D"},
+			},
+		},
+		{
+			name: "state type filters when no state id",
+			params: FetchIssuesParams{
+				StateTypes: []string{"backlog", "started"},
+			},
+			want: IssueFilter{
+				"state": map[string]interface{}{"type": map[string]interface{}{"in": []string{"backlog", "started"}}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

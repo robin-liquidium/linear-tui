@@ -195,6 +195,7 @@ type Issue struct {
 	Assignee    string
 	AssigneeID  string
 	Priority    int
+	DueDate     time.Time
 	UpdatedAt   time.Time
 	CreatedAt   time.Time
 	TeamID      string
@@ -222,10 +223,15 @@ type IssuePage struct {
 
 // FetchIssuesParams contains parameters for fetching issues.
 type FetchIssuesParams struct {
-	TeamID    string
-	ProjectID string
-	StateID   string
-	Search    string
+	TeamID     string
+	ProjectID  string
+	StateID    string
+	AssigneeID string
+	LabelID    string
+	StateTypes []string
+	// DueWithinDays filters issues due within N days from now (inclusive of overdue).
+	DueWithinDays int
+	Search        string
 	// OrderBy specifies the sort order. Valid API values are "updatedAt" and "createdAt".
 	// "priority" is also supported and will be sorted client-side after fetching.
 	OrderBy string
@@ -514,6 +520,17 @@ func buildBaseIssueFilter(params FetchIssuesParams) IssueFilter {
 	}
 	if params.StateID != "" {
 		filter["state"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.StateID}}
+	} else if len(params.StateTypes) > 0 {
+		filter["state"] = map[string]interface{}{"type": map[string]interface{}{"in": params.StateTypes}}
+	}
+	if params.AssigneeID != "" {
+		filter["assignee"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.AssigneeID}}
+	}
+	if params.LabelID != "" {
+		filter["labels"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.LabelID}}
+	}
+	if params.DueWithinDays > 0 {
+		filter["dueDate"] = map[string]interface{}{"lt": fmt.Sprintf("P%dD", params.DueWithinDays)}
 	}
 	return filter
 }
@@ -651,6 +668,7 @@ func (c *Client) searchIssuesPage(ctx context.Context, params FetchIssuesParams,
 					Name graphql.String
 				}
 				Priority    graphql.Float
+				DueDate     *graphql.String
 				UpdatedAt   graphql.String
 				CreatedAt   graphql.String
 				Description *graphql.String
@@ -901,6 +919,11 @@ func (c *Client) parseIssueNode(node interface{}) Issue {
 	createdAt := parseTime(v.FieldByName("CreatedAt").String())
 
 	priority := int(v.FieldByName("Priority").Float())
+	dueDate := time.Time{}
+	dueDateField := v.FieldByName("DueDate")
+	if dueDateField.IsValid() && dueDateField.Kind() == reflect.Pointer && !dueDateField.IsNil() {
+		dueDate = parseTime(dueDateField.Elem().String())
+	}
 
 	assignee := ""
 	assigneeID := ""
@@ -975,6 +998,7 @@ func (c *Client) parseIssueNode(node interface{}) Issue {
 		Assignee:    assignee,
 		AssigneeID:  assigneeID,
 		Priority:    priority,
+		DueDate:     dueDate,
 		UpdatedAt:   updatedAt,
 		CreatedAt:   createdAt,
 		Description: description,
@@ -1021,6 +1045,7 @@ func (c *Client) FetchIssueByID(ctx context.Context, id string) (Issue, error) {
 				Name graphql.String
 			}
 			Priority    graphql.Float
+			DueDate     *graphql.String
 			UpdatedAt   graphql.String
 			CreatedAt   graphql.String
 			Description *graphql.String
@@ -1085,6 +1110,10 @@ func (c *Client) FetchIssueByID(ctx context.Context, id string) (Issue, error) {
 
 	updatedAt := parseTime(string(query.Issue.UpdatedAt))
 	createdAt := parseTime(string(query.Issue.CreatedAt))
+	dueDate := time.Time{}
+	if query.Issue.DueDate != nil {
+		dueDate = parseTime(string(*query.Issue.DueDate))
+	}
 
 	assignee := ""
 	assigneeID := ""
@@ -1167,6 +1196,7 @@ func (c *Client) FetchIssueByID(ctx context.Context, id string) (Issue, error) {
 		Assignee:    assignee,
 		AssigneeID:  assigneeID,
 		Priority:    int(query.Issue.Priority),
+		DueDate:     dueDate,
 		UpdatedAt:   updatedAt,
 		CreatedAt:   createdAt,
 		Description: description,
@@ -1199,6 +1229,7 @@ func (c *Client) CreateIssue(ctx context.Context, input CreateIssueInput) (Issue
 					Name graphql.String
 				}
 				Priority    graphql.Float
+				DueDate     *graphql.String
 				UpdatedAt   graphql.String
 				CreatedAt   graphql.String
 				Description *graphql.String
@@ -1261,6 +1292,10 @@ func (c *Client) CreateIssue(ctx context.Context, input CreateIssueInput) (Issue
 	node := mutation.IssueCreate.Issue
 	updatedAt := parseTime(string(node.UpdatedAt))
 	createdAt := parseTime(string(node.CreatedAt))
+	dueDate := time.Time{}
+	if node.DueDate != nil {
+		dueDate = parseTime(string(*node.DueDate))
+	}
 
 	assignee := ""
 	assigneeID := ""
@@ -1298,6 +1333,7 @@ func (c *Client) CreateIssue(ctx context.Context, input CreateIssueInput) (Issue
 		Assignee:    assignee,
 		AssigneeID:  assigneeID,
 		Priority:    int(node.Priority),
+		DueDate:     dueDate,
 		UpdatedAt:   updatedAt,
 		CreatedAt:   createdAt,
 		Description: description,
@@ -1326,6 +1362,7 @@ func (c *Client) UpdateIssue(ctx context.Context, input UpdateIssueInput) (Issue
 					Name graphql.String
 				}
 				Priority    graphql.Float
+				DueDate     *graphql.String
 				UpdatedAt   graphql.String
 				CreatedAt   graphql.String
 				Description *graphql.String
@@ -1405,6 +1442,10 @@ func (c *Client) UpdateIssue(ctx context.Context, input UpdateIssueInput) (Issue
 	node := mutation.IssueUpdate.Issue
 	updatedAt := parseTime(string(node.UpdatedAt))
 	createdAt := parseTime(string(node.CreatedAt))
+	dueDate := time.Time{}
+	if node.DueDate != nil {
+		dueDate = parseTime(string(*node.DueDate))
+	}
 
 	assignee := ""
 	assigneeID := ""
@@ -1442,6 +1483,7 @@ func (c *Client) UpdateIssue(ctx context.Context, input UpdateIssueInput) (Issue
 		Assignee:    assignee,
 		AssigneeID:  assigneeID,
 		Priority:    int(node.Priority),
+		DueDate:     dueDate,
 		UpdatedAt:   updatedAt,
 		CreatedAt:   createdAt,
 		Description: description,

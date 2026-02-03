@@ -36,20 +36,24 @@ A terminal user interface (TUI) for Linear built with Go and tview.
 - Themes (linear, high_contrast, color_blind) and density modes
 - Status bar with context and search info
 - Clipboard actions (issue ID, issue URL, agent output)
+- Custom views with filters (assignee, status, due date, project, team, label) and two-level sorting
+- Panel toggles and persistence for navigation and issue panes
 
 ## Requirements
 
-- Linear API key (set as `LINEAR_API_KEY` environment variable)
+- Linear API key (set in-app or via `LINEAR_API_KEY` environment variable)
 - Agent CLI for the agent command:
   - Claude provider: `claude`
   - Cursor provider: `cursor-agent` (preferred) or `agent`
 
 ## Configuration
 
-- `LINEAR_API_KEY` is required (the API key is not stored on disk).
+- `LINEAR_API_KEY` is optional; the API key can be stored locally in `~/.linear-tui/config.json` via the in-app prompt or Settings.
 - Settings are stored in `~/.linear-tui/config.json` and created on first start.
 - Use the Settings modal from the command palette (`:` -> `Settings`) to edit and apply settings immediately.
 - UI settings in `config.json`: `theme` (`linear`, `high_contrast`, `color_blind`) and `density` (`comfortable`, `compact`).
+- Issue filtering settings in `config.json`: `include_completed` (false to hide done/canceled in “All Issues” and views without explicit status filters).
+- Panel visibility settings in `config.json`: `show_navigation`, `show_my_issues`, `show_other_issues`.
 - Agent settings live in `config.json`: `agent_provider` (`cursor` or `claude`), `agent_sandbox` (`enabled` or `disabled`), `agent_model` (optional), and `agent_workspace` (optional).
 - Prompt templates are stored in `~/.linear-tui/prompts.json` and edited via the "Edit agent prompt templates" command.
 - `agent_workspace` is the default workspace for agent runs and can be overridden per run in the Ask Agent modal (overrides are not persisted).
@@ -69,7 +73,11 @@ Example `~/.linear-tui/config.json`:
   "agent_provider": "cursor",
   "agent_sandbox": "enabled",
   "agent_model": "",
-  "agent_workspace": ""
+  "agent_workspace": "",
+  "include_completed": false,
+  "show_navigation": true,
+  "show_my_issues": true,
+  "show_other_issues": true
 }
 ```
 
@@ -105,7 +113,7 @@ Download pre-built binaries from the [Releases](https://github.com/roeyazroel/li
 
 ### Basic Usage
 
-Set your Linear API key and run the application:
+Set your Linear API key and run the application (or launch and enter the key in-app when prompted):
 
 ```bash
 export LINEAR_API_KEY="your-api-key-here"
@@ -157,6 +165,7 @@ To disable logging, set `log_file` to an empty string in the settings file or vi
 - `Space` - Toggle expand/collapse sub-issues
 - `Enter` - Select issue / Execute command
 - `Esc` - Close palette / Cancel / Clear search
+- `z` - Collapse/expand focused pane (navigation or issues)
 - `q` - Quit
 
 ### Command Palette
@@ -172,6 +181,7 @@ To disable logging, set `log_file` to an empty string in the settings file or vi
 - `e` - Edit issue title
 - `g` - Edit issue labels
 - `s` - Change status
+- `p` - Change priority
 - `a` - Assign to user
 - `m` - Assign to me
 - `u` - Unassign issue
@@ -186,6 +196,12 @@ To disable logging, set `log_file` to an empty string in the settings file or vi
 - `d` - Remove parent
 - `]` - Expand all sub-issues
 - `[` - Collapse all sub-issues
+
+### Custom Views
+
+- Custom views live under “Custom Views” in the left pane.
+- Use command palette actions: `Add custom view`, `Edit custom view`, `Delete custom view`.
+- Views are stored in `~/.linear-tui/views.json`.
 
 ## Development
 

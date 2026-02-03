@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/roeyazroel/linear-tui/internal/config"
 	"github.com/roeyazroel/linear-tui/internal/linearapi"
@@ -33,11 +34,37 @@ func main() {
 	apiKey := os.Getenv(config.LinearAPIKeyEnv)
 	cfg, err := config.ConfigFromSettings(apiKey, settings)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
-		if apiKey == "" {
-			fmt.Fprintf(os.Stderr, "Please set the %s environment variable.\n", config.LinearAPIKeyEnv)
+		// Allow launching without an API key; the app will prompt for it.
+		timeout, _ := time.ParseDuration(settings.Timeout)
+		cacheTTL, _ := time.ParseDuration(settings.CacheTTL)
+		if timeout == 0 {
+			timeout = config.DefaultTimeout
 		}
-		os.Exit(1)
+		if cacheTTL == 0 {
+			cacheTTL = config.DefaultCacheTTL
+		}
+		if settings.PageSize <= 0 {
+			settings.PageSize = config.DefaultPageSize
+		}
+		cfg = config.Config{
+			LinearAPIKey:     "",
+			APIEndpoint:      settings.APIEndpoint,
+			Timeout:          timeout,
+			PageSize:         settings.PageSize,
+			CacheTTL:         cacheTTL,
+			LogFile:          settings.LogFile,
+			LogLevel:         settings.LogLevel,
+			Theme:            settings.Theme,
+			Density:          settings.Density,
+			AgentProvider:    settings.AgentProvider,
+			AgentSandbox:     settings.AgentSandbox,
+			AgentModel:       settings.AgentModel,
+			AgentWorkspace:   settings.AgentWorkspace,
+			IncludeCompleted: settings.IncludeCompleted,
+			ShowNavigation:   settings.ShowNavigation,
+			ShowMyIssues:     settings.ShowMyIssues,
+			ShowOtherIssues:  settings.ShowOtherIssues,
+		}
 	}
 
 	// Initialize logger
@@ -76,8 +103,22 @@ func main() {
 		}
 	}
 
+	viewsPath, err := config.CustomViewsFilePath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error determining custom views path: %v\n", err)
+	}
+	customViews := []config.CustomView{}
+	if err == nil {
+		views, err := config.EnsureCustomViewsFile(viewsPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading custom views file: %v\n", err)
+		} else {
+			customViews = views
+		}
+	}
+
 	// Create and run tview application
-	app := tui.NewApp(apiClient, cfg, promptTemplates)
+	app := tui.NewApp(apiClient, cfg, promptTemplates, customViews, viewsPath)
 
 	if err := app.Run(); err != nil {
 		logger.ErrorWithErr(err, "app.main: application error")

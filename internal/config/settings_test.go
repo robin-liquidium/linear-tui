@@ -160,6 +160,19 @@ func TestConfigFromSettingsRequiresAPIKey(t *testing.T) {
 	}
 }
 
+func TestConfigFromSettingsAPIKeyFromSettings(t *testing.T) {
+	settings := DefaultSettings()
+	settings.LinearAPIKey = "settings-key"
+
+	cfg, err := ConfigFromSettings("", settings)
+	if err != nil {
+		t.Fatalf("ConfigFromSettings() error: %v", err)
+	}
+	if cfg.LinearAPIKey != "settings-key" {
+		t.Fatalf("LinearAPIKey = %q, want %q", cfg.LinearAPIKey, "settings-key")
+	}
+}
+
 // TestDefaultSettingsAgentDefaults verifies agent defaults are set.
 func TestDefaultSettingsAgentDefaults(t *testing.T) {
 	settings := DefaultSettings()

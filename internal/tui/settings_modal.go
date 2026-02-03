@@ -214,32 +214,34 @@ func agentModelOptionsForProvider(provider string) ([]string, []string) {
 
 // SettingsModal manages the settings form overlay.
 type SettingsModal struct {
-	app                  *App
-	modal                *tview.Flex
-	modalBody            *tview.Flex
-	modalContent         *tview.Flex
-	form                 *tview.Form
-	endpointField        *tview.InputField
-	timeoutField         *tview.InputField
-	pageSizeField        *tview.InputField
-	cacheTTLField        *tview.InputField
-	logFileField         *tview.InputField
-	logLevelField        *tview.DropDown
-	logLevelOptions      []string
-	themeField           *tview.DropDown
-	themeOptions         []string
-	themeValues          []string
-	densityField         *tview.DropDown
-	densityOptions       []string
-	densityValues        []string
-	agentProviderField   *tview.DropDown
-	agentProviderOptions []string
-	agentSandboxField    *tview.DropDown
-	agentSandboxOptions  []string
-	agentModelField      *tview.DropDown
-	agentModelOptions    []string
-	agentModelValues     []string
-	agentWorkspaceField  *tview.InputField
+	app                   *App
+	modal                 *tview.Flex
+	modalBody             *tview.Flex
+	modalContent          *tview.Flex
+	form                  *tview.Form
+	endpointField         *tview.InputField
+	timeoutField          *tview.InputField
+	pageSizeField         *tview.InputField
+	cacheTTLField         *tview.InputField
+	logFileField          *tview.InputField
+	logLevelField         *tview.DropDown
+	logLevelOptions       []string
+	themeField            *tview.DropDown
+	themeOptions          []string
+	themeValues           []string
+	densityField          *tview.DropDown
+	densityOptions        []string
+	densityValues         []string
+	agentProviderField    *tview.DropDown
+	agentProviderOptions  []string
+	agentSandboxField     *tview.DropDown
+	agentSandboxOptions   []string
+	agentModelField       *tview.DropDown
+	agentModelOptions     []string
+	agentModelValues      []string
+	agentWorkspaceField   *tview.InputField
+	includeCompletedField *tview.Checkbox
+	apiKeyField           *tview.InputField
 }
 
 // NewSettingsModal creates a new settings modal.
@@ -296,6 +298,17 @@ func NewSettingsModal(app *App) *SettingsModal {
 		SetLabel("Cache TTL").
 		SetFieldWidth(20)
 	sm.form.AddFormItem(sm.cacheTTLField)
+
+	sm.apiKeyField = tview.NewInputField().
+		SetLabel("Linear API key").
+		SetFieldWidth(60)
+	sm.apiKeyField.SetMaskCharacter('*')
+	sm.form.AddFormItem(sm.apiKeyField)
+
+	sm.includeCompletedField = tview.NewCheckbox().
+		SetLabel("Include completed/canceled issues")
+	sm.includeCompletedField.SetChecked(false)
+	sm.form.AddFormItem(sm.includeCompletedField)
 
 	sm.logFileField = tview.NewInputField().
 		SetLabel("Log file").
@@ -429,6 +442,8 @@ func (sm *SettingsModal) Show() {
 	sm.timeoutField.SetText(settings.Timeout)
 	sm.pageSizeField.SetText(strconv.Itoa(settings.PageSize))
 	sm.cacheTTLField.SetText(settings.CacheTTL)
+	sm.apiKeyField.SetText(settings.LinearAPIKey)
+	sm.includeCompletedField.SetChecked(settings.IncludeCompleted)
 	sm.logFileField.SetText(settings.LogFile)
 	sm.setLogLevelSelection(settings.LogLevel)
 	sm.setThemeSelection(settings.Theme)
@@ -591,21 +606,23 @@ func (sm *SettingsModal) saveSettings() {
 	}
 
 	settings := config.Settings{
-		APIEndpoint:    strings.TrimSpace(sm.endpointField.GetText()),
-		Timeout:        strings.TrimSpace(sm.timeoutField.GetText()),
-		PageSize:       pageSize,
-		CacheTTL:       strings.TrimSpace(sm.cacheTTLField.GetText()),
-		LogFile:        strings.TrimSpace(sm.logFileField.GetText()),
-		LogLevel:       logLevel,
-		Theme:          theme,
-		Density:        density,
-		AgentProvider:  agentProvider,
-		AgentSandbox:   agentSandbox,
-		AgentModel:     agentModel,
-		AgentWorkspace: strings.TrimSpace(sm.agentWorkspaceField.GetText()),
+		APIEndpoint:      strings.TrimSpace(sm.endpointField.GetText()),
+		Timeout:          strings.TrimSpace(sm.timeoutField.GetText()),
+		PageSize:         pageSize,
+		CacheTTL:         strings.TrimSpace(sm.cacheTTLField.GetText()),
+		LogFile:          strings.TrimSpace(sm.logFileField.GetText()),
+		LogLevel:         logLevel,
+		Theme:            theme,
+		Density:          density,
+		AgentProvider:    agentProvider,
+		AgentSandbox:     agentSandbox,
+		AgentModel:       agentModel,
+		AgentWorkspace:   strings.TrimSpace(sm.agentWorkspaceField.GetText()),
+		IncludeCompleted: sm.includeCompletedField.IsChecked(),
+		LinearAPIKey:     strings.TrimSpace(sm.apiKeyField.GetText()),
 	}
 
-	newCfg, err := config.ConfigFromSettings(sm.app.config.LinearAPIKey, settings)
+	newCfg, err := config.ConfigFromSettings("", settings)
 	if err != nil {
 		logger.ErrorWithErr(err, "tui.settings: failed to parse settings")
 		sm.app.updateStatusBarWithError(err)

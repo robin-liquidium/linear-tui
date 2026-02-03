@@ -12,74 +12,97 @@ import (
 
 // SettingsFile represents the on-disk JSON with optional fields.
 type SettingsFile struct {
-	APIEndpoint    *string `json:"api_endpoint"`
-	Timeout        *string `json:"timeout"`
-	PageSize       *int    `json:"page_size"`
-	CacheTTL       *string `json:"cache_ttl"`
-	LogFile        *string `json:"log_file"`
-	LogLevel       *string `json:"log_level"`
-	Theme          *string `json:"theme"`
-	Density        *string `json:"density"`
-	AgentProvider  *string `json:"agent_provider"`
-	AgentSandbox   *string `json:"agent_sandbox"`
-	AgentModel     *string `json:"agent_model"`
-	AgentWorkspace *string `json:"agent_workspace"`
+	APIEndpoint      *string `json:"api_endpoint"`
+	Timeout          *string `json:"timeout"`
+	PageSize         *int    `json:"page_size"`
+	CacheTTL         *string `json:"cache_ttl"`
+	LogFile          *string `json:"log_file"`
+	LogLevel         *string `json:"log_level"`
+	Theme            *string `json:"theme"`
+	Density          *string `json:"density"`
+	AgentProvider    *string `json:"agent_provider"`
+	AgentSandbox     *string `json:"agent_sandbox"`
+	AgentModel       *string `json:"agent_model"`
+	AgentWorkspace   *string `json:"agent_workspace"`
+	IncludeCompleted *bool   `json:"include_completed"`
+	ShowNavigation   *bool   `json:"show_navigation"`
+	ShowMyIssues     *bool   `json:"show_my_issues"`
+	ShowOtherIssues  *bool   `json:"show_other_issues"`
+	LinearAPIKey     *string `json:"linear_api_key"`
 }
 
 // Settings contains concrete settings values for UI and persistence.
 type Settings struct {
-	APIEndpoint    string `json:"api_endpoint"`
-	Timeout        string `json:"timeout"`
-	PageSize       int    `json:"page_size"`
-	CacheTTL       string `json:"cache_ttl"`
-	LogFile        string `json:"log_file"`
-	LogLevel       string `json:"log_level"`
-	Theme          string `json:"theme"`
-	Density        string `json:"density"`
-	AgentProvider  string `json:"agent_provider"`
-	AgentSandbox   string `json:"agent_sandbox"`
-	AgentModel     string `json:"agent_model"`
-	AgentWorkspace string `json:"agent_workspace"`
+	APIEndpoint      string `json:"api_endpoint"`
+	Timeout          string `json:"timeout"`
+	PageSize         int    `json:"page_size"`
+	CacheTTL         string `json:"cache_ttl"`
+	LogFile          string `json:"log_file"`
+	LogLevel         string `json:"log_level"`
+	Theme            string `json:"theme"`
+	Density          string `json:"density"`
+	AgentProvider    string `json:"agent_provider"`
+	AgentSandbox     string `json:"agent_sandbox"`
+	AgentModel       string `json:"agent_model"`
+	AgentWorkspace   string `json:"agent_workspace"`
+	IncludeCompleted bool   `json:"include_completed"`
+	ShowNavigation   bool   `json:"show_navigation"`
+	ShowMyIssues     bool   `json:"show_my_issues"`
+	ShowOtherIssues  bool   `json:"show_other_issues"`
+	LinearAPIKey     string `json:"linear_api_key"`
 }
 
 // DefaultSettings returns the default settings for the config file and UI.
 func DefaultSettings() Settings {
 	return Settings{
-		APIEndpoint:    DefaultAPIEndpoint,
-		Timeout:        DefaultTimeout.String(),
-		PageSize:       DefaultPageSize,
-		CacheTTL:       DefaultCacheTTL.String(),
-		LogFile:        getDefaultLogFile(),
-		LogLevel:       DefaultLogLevel,
-		Theme:          DefaultTheme,
-		Density:        DefaultDensity,
-		AgentProvider:  DefaultAgentProvider,
-		AgentSandbox:   DefaultAgentSandbox,
-		AgentModel:     "",
-		AgentWorkspace: "",
+		APIEndpoint:      DefaultAPIEndpoint,
+		Timeout:          DefaultTimeout.String(),
+		PageSize:         DefaultPageSize,
+		CacheTTL:         DefaultCacheTTL.String(),
+		LogFile:          getDefaultLogFile(),
+		LogLevel:         DefaultLogLevel,
+		Theme:            DefaultTheme,
+		Density:          DefaultDensity,
+		AgentProvider:    DefaultAgentProvider,
+		AgentSandbox:     DefaultAgentSandbox,
+		AgentModel:       "",
+		AgentWorkspace:   "",
+		IncludeCompleted: false,
+		ShowNavigation:   true,
+		ShowMyIssues:     true,
+		ShowOtherIssues:  true,
+		LinearAPIKey:     "",
 	}
 }
 
 // SettingsFromConfig converts runtime config into settings values.
 func SettingsFromConfig(cfg Config) Settings {
 	return Settings{
-		APIEndpoint:    cfg.APIEndpoint,
-		Timeout:        cfg.Timeout.String(),
-		PageSize:       cfg.PageSize,
-		CacheTTL:       cfg.CacheTTL.String(),
-		LogFile:        cfg.LogFile,
-		LogLevel:       cfg.LogLevel,
-		Theme:          cfg.Theme,
-		Density:        cfg.Density,
-		AgentProvider:  cfg.AgentProvider,
-		AgentSandbox:   cfg.AgentSandbox,
-		AgentModel:     cfg.AgentModel,
-		AgentWorkspace: cfg.AgentWorkspace,
+		APIEndpoint:      cfg.APIEndpoint,
+		Timeout:          cfg.Timeout.String(),
+		PageSize:         cfg.PageSize,
+		CacheTTL:         cfg.CacheTTL.String(),
+		LogFile:          cfg.LogFile,
+		LogLevel:         cfg.LogLevel,
+		Theme:            cfg.Theme,
+		Density:          cfg.Density,
+		AgentProvider:    cfg.AgentProvider,
+		AgentSandbox:     cfg.AgentSandbox,
+		AgentModel:       cfg.AgentModel,
+		AgentWorkspace:   cfg.AgentWorkspace,
+		IncludeCompleted: cfg.IncludeCompleted,
+		ShowNavigation:   cfg.ShowNavigation,
+		ShowMyIssues:     cfg.ShowMyIssues,
+		ShowOtherIssues:  cfg.ShowOtherIssues,
+		LinearAPIKey:     cfg.LinearAPIKey,
 	}
 }
 
 // ConfigFromSettings builds runtime configuration from settings and API key.
 func ConfigFromSettings(apiKey string, settings Settings) (Config, error) {
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(settings.LinearAPIKey)
+	}
 	if apiKey == "" {
 		return Config{}, fmt.Errorf("%s environment variable is not set", LinearAPIKeyEnv)
 	}
@@ -127,19 +150,23 @@ func ConfigFromSettings(apiKey string, settings Settings) (Config, error) {
 	}
 
 	return Config{
-		LinearAPIKey:   apiKey,
-		APIEndpoint:    settings.APIEndpoint,
-		Timeout:        timeout,
-		PageSize:       settings.PageSize,
-		CacheTTL:       cacheTTL,
-		LogFile:        settings.LogFile,
-		LogLevel:       settings.LogLevel,
-		Theme:          theme,
-		Density:        density,
-		AgentProvider:  settings.AgentProvider,
-		AgentSandbox:   settings.AgentSandbox,
-		AgentModel:     settings.AgentModel,
-		AgentWorkspace: settings.AgentWorkspace,
+		LinearAPIKey:     apiKey,
+		APIEndpoint:      settings.APIEndpoint,
+		Timeout:          timeout,
+		PageSize:         settings.PageSize,
+		CacheTTL:         cacheTTL,
+		LogFile:          settings.LogFile,
+		LogLevel:         settings.LogLevel,
+		Theme:            theme,
+		Density:          density,
+		AgentProvider:    settings.AgentProvider,
+		AgentSandbox:     settings.AgentSandbox,
+		AgentModel:       settings.AgentModel,
+		AgentWorkspace:   settings.AgentWorkspace,
+		IncludeCompleted: settings.IncludeCompleted,
+		ShowNavigation:   settings.ShowNavigation,
+		ShowMyIssues:     settings.ShowMyIssues,
+		ShowOtherIssues:  settings.ShowOtherIssues,
 	}, nil
 }
 
@@ -225,6 +252,21 @@ func LoadSettings(path string) (Settings, error) {
 	}
 	if file.AgentWorkspace != nil {
 		settings.AgentWorkspace = *file.AgentWorkspace
+	}
+	if file.IncludeCompleted != nil {
+		settings.IncludeCompleted = *file.IncludeCompleted
+	}
+	if file.ShowNavigation != nil {
+		settings.ShowNavigation = *file.ShowNavigation
+	}
+	if file.ShowMyIssues != nil {
+		settings.ShowMyIssues = *file.ShowMyIssues
+	}
+	if file.ShowOtherIssues != nil {
+		settings.ShowOtherIssues = *file.ShowOtherIssues
+	}
+	if file.LinearAPIKey != nil {
+		settings.LinearAPIKey = *file.LinearAPIKey
 	}
 
 	return settings, nil

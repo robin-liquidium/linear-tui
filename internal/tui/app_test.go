@@ -34,7 +34,7 @@ func TestRefreshIssues_LazyLoadsPages(t *testing.T) {
 		PageSize: 2,
 		CacheTTL: time.Minute,
 	}
-	app := NewApp(&linearapi.Client{}, cfg, nil)
+	app := NewApp(&linearapi.Client{}, cfg, nil, nil, "")
 	app.queueUpdateDraw = func(f func()) { f() }
 
 	issue1 := linearapi.Issue{ID: "issue-1", Identifier: "ABC-1", Title: "First", State: "Todo"}
@@ -98,7 +98,7 @@ func TestRefreshIssues_CancelsStaleLoad(t *testing.T) {
 		PageSize: 2,
 		CacheTTL: time.Minute,
 	}
-	app := NewApp(&linearapi.Client{}, cfg, nil)
+	app := NewApp(&linearapi.Client{}, cfg, nil, nil, "")
 	app.queueUpdateDraw = func(f func()) { f() }
 
 	issue1 := linearapi.Issue{ID: "issue-1", Identifier: "ABC-1", Title: "First", State: "Todo"}
@@ -171,7 +171,7 @@ func TestRefreshIssues_PreservesNavigationFocus(t *testing.T) {
 		PageSize: 1,
 		CacheTTL: time.Minute,
 	}
-	app := NewApp(&linearapi.Client{}, cfg, nil)
+	app := NewApp(&linearapi.Client{}, cfg, nil, nil, "")
 	app.queueUpdateDraw = func(f func()) { f() }
 
 	issue := linearapi.Issue{ID: "issue-1", Identifier: "ABC-1", Title: "First", State: "Todo"}
@@ -204,7 +204,7 @@ func TestRefreshIssues_IncludesStateID(t *testing.T) {
 		PageSize: 1,
 		CacheTTL: time.Minute,
 	}
-	app := NewApp(&linearapi.Client{}, cfg, nil)
+	app := NewApp(&linearapi.Client{}, cfg, nil, nil, "")
 	app.queueUpdateDraw = func(f func()) { f() }
 
 	called := make(chan linearapi.FetchIssuesParams, 1)
