@@ -307,21 +307,9 @@ func (a *App) applyThemeToComponents() {
 			SetTitleColor(a.theme.Foreground)
 		a.recolorNavigationTree()
 	}
-	if a.collapsedMyIssues != nil {
-		a.collapsedMyIssues.SetBorderColor(a.theme.Border)
-		a.collapsedMyIssues.SetBackgroundColor(a.theme.Background)
-		a.collapsedMyIssues.SetTextColor(a.theme.SecondaryText)
-	}
-	if a.collapsedOtherIssues != nil {
-		a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
-		a.collapsedOtherIssues.SetBackgroundColor(a.theme.Background)
-		a.collapsedOtherIssues.SetTextColor(a.theme.SecondaryText)
-	}
-	if a.collapsedNavigation != nil {
-		a.collapsedNavigation.SetBorderColor(a.theme.Border)
-		a.collapsedNavigation.SetBackgroundColor(a.theme.Background)
-		a.collapsedNavigation.SetTextColor(a.theme.SecondaryText)
-	}
+	a.applyCollapsedPaneTheme(a.collapsedMyIssues)
+	a.applyCollapsedPaneTheme(a.collapsedOtherIssues)
+	a.applyCollapsedPaneTheme(a.collapsedNavigation)
 
 	if a.myIssuesTable != nil {
 		a.applyIssuesTableTheme(a.myIssuesTable)
@@ -335,11 +323,7 @@ func (a *App) applyThemeToComponents() {
 		a.issuesEmptyView.SetTextColor(a.theme.SecondaryText)
 		a.issuesEmptyView.SetBackgroundColor(a.theme.Background)
 	}
-	if a.collapsedIssues != nil {
-		a.collapsedIssues.SetBorderColor(a.theme.Border)
-		a.collapsedIssues.SetBackgroundColor(a.theme.Background)
-		a.collapsedIssues.SetTextColor(a.theme.SecondaryText)
-	}
+	a.applyCollapsedPaneTheme(a.collapsedIssues)
 
 	if a.detailsDescriptionView != nil {
 		a.detailsDescriptionView.SetTitleColor(a.theme.Foreground).
@@ -358,6 +342,15 @@ func (a *App) applyThemeToComponents() {
 	if a.statusBar != nil {
 		a.statusBar.SetBackgroundColor(a.theme.HeaderBg)
 	}
+}
+
+func (a *App) applyCollapsedPaneTheme(view *tview.TextView) {
+	if view == nil {
+		return
+	}
+	view.SetBorderColor(a.theme.Border)
+	view.SetBackgroundColor(a.theme.Background)
+	view.SetTextColor(a.theme.SecondaryText)
 }
 
 func (a *App) applyDensityToComponents() {
@@ -758,41 +751,11 @@ func (a *App) buildLayout() {
 	a.otherIssuesTable = a.buildIssuesTable(" Other Issues ", IssuesSectionOther)
 	// Create vertical flex for issues column
 	a.issuesColumn = tview.NewFlex().SetDirection(tview.FlexRow)
-	a.issuesEmptyView = tview.NewTextView()
-	a.issuesEmptyView.SetText("Issues panel hidden")
-	a.issuesEmptyView.SetTextColor(a.theme.SecondaryText)
-	a.issuesEmptyView.SetTextAlign(tview.AlignCenter)
-	a.issuesEmptyView.SetBackgroundColor(a.theme.Background)
-	a.collapsedMyIssues = tview.NewTextView()
-	a.collapsedMyIssues.SetBorder(true)
-	a.collapsedMyIssues.SetBorderColor(a.theme.Border)
-	a.collapsedMyIssues.SetBackgroundColor(a.theme.Background)
-	a.collapsedMyIssues.SetText("My Issues")
-	a.collapsedMyIssues.SetTextAlign(tview.AlignCenter)
-	a.collapsedMyIssues.SetWrap(false)
-
-	a.collapsedOtherIssues = tview.NewTextView()
-	a.collapsedOtherIssues.SetBorder(true)
-	a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
-	a.collapsedOtherIssues.SetBackgroundColor(a.theme.Background)
-	a.collapsedOtherIssues.SetText("Other Issues")
-	a.collapsedOtherIssues.SetTextAlign(tview.AlignCenter)
-	a.collapsedOtherIssues.SetWrap(false)
-
-	a.collapsedNavigation = tview.NewTextView()
-	a.collapsedNavigation.SetBorder(true)
-	a.collapsedNavigation.SetBorderColor(a.theme.Border)
-	a.collapsedNavigation.SetBackgroundColor(a.theme.Background)
-	a.collapsedNavigation.SetText("N\nA\nV")
-	a.collapsedNavigation.SetTextAlign(tview.AlignCenter)
-	a.collapsedNavigation.SetWrap(false)
-	a.collapsedIssues = tview.NewTextView()
-	a.collapsedIssues.SetBorder(true)
-	a.collapsedIssues.SetBorderColor(a.theme.Border)
-	a.collapsedIssues.SetBackgroundColor(a.theme.Background)
-	a.collapsedIssues.SetText("I\nS\nS")
-	a.collapsedIssues.SetTextAlign(tview.AlignCenter)
-	a.collapsedIssues.SetWrap(false)
+	a.issuesEmptyView = a.newCenteredTextView("Issues panel hidden")
+	a.collapsedMyIssues = a.newCollapsedPane("My Issues", false)
+	a.collapsedOtherIssues = a.newCollapsedPane("Other Issues", false)
+	a.collapsedNavigation = a.newCollapsedPane("NAV", true)
+	a.collapsedIssues = a.newCollapsedPane("ISS", true)
 	// Initially show only Other Issues table (My Issues will be added when issues are loaded)
 	a.issuesColumn.AddItem(a.otherIssuesTable, 0, 1, false)
 	// Legacy table for backward compatibility (will be removed after migration)
@@ -836,6 +799,39 @@ func (a *App) buildLayout() {
 	// Set initial focus
 	a.rebuildContentLayout()
 	a.updateFocus()
+}
+
+// newCenteredTextView creates a centered label with theme background defaults.
+func (a *App) newCenteredTextView(text string) *tview.TextView {
+	view := tview.NewTextView()
+	view.SetText(text)
+	view.SetTextAlign(tview.AlignCenter)
+	view.SetTextColor(a.theme.SecondaryText)
+	view.SetBackgroundColor(a.theme.Background)
+	return view
+}
+
+// newCollapsedPane creates a minimal placeholder for hidden panes.
+func (a *App) newCollapsedPane(label string, vertical bool) *tview.TextView {
+	view := tview.NewTextView()
+	view.SetBorder(true)
+	view.SetBorderColor(a.theme.Border)
+	view.SetBackgroundColor(a.theme.Background)
+	view.SetTextAlign(tview.AlignCenter)
+	view.SetWrap(false)
+
+	if vertical {
+		runes := []rune(label)
+		var lines []string
+		for _, r := range runes {
+			lines = append(lines, string(r))
+		}
+		view.SetText(strings.Join(lines, "\n"))
+	} else {
+		view.SetText(label)
+	}
+
+	return view
 }
 
 // bindGlobalKeys sets up global keyboard shortcuts.
@@ -923,70 +919,7 @@ func (a *App) bindGlobalKeys() {
 			// Only cycle when not in palette or modals
 			isBackward := event.Key() == tcell.KeyBacktab || event.Modifiers()&tcell.ModShift != 0
 			if a.focusedPane != FocusPalette {
-				if a.focusedPane == FocusDetails {
-					if !a.detailsCommentsVisible {
-						if isBackward {
-							a.cyclePanesBackward()
-						} else {
-							a.cyclePanesForward()
-						}
-						return nil
-					}
-					// Cycle between description and comments within details pane
-					if !isBackward {
-						// Tab: description -> comments -> next pane
-						if a.focusedDetailsView {
-							// Currently on comments, move to next pane
-							a.focusedDetailsView = false // Reset for next time
-							a.cyclePanesForward()
-						} else {
-							// Currently on description, move to comments
-							a.focusedDetailsView = true
-							a.updateFocus()
-						}
-					} else {
-						// Shift+Tab: comments -> description -> previous pane
-						if a.focusedDetailsView {
-							// Currently on comments, move to description
-							a.focusedDetailsView = false
-							a.updateFocus()
-						} else {
-							// Currently on description, move to previous pane
-							a.cyclePanesBackward()
-						}
-					}
-				} else if a.focusedPane == FocusIssues {
-					if a.showMyIssues && a.showOtherIssues {
-						if isBackward {
-							if a.activeIssuesSection == IssuesSectionMy {
-								a.activeIssuesSection = IssuesSectionOther
-							} else {
-								a.activeIssuesSection = IssuesSectionMy
-							}
-						} else {
-							if a.activeIssuesSection == IssuesSectionMy {
-								a.activeIssuesSection = IssuesSectionOther
-							} else {
-								a.activeIssuesSection = IssuesSectionMy
-							}
-						}
-						a.updateFocus()
-						return nil
-					}
-					if isBackward {
-						// Shift+Tab cycles backward
-						a.cyclePanesBackward()
-					} else {
-						a.cyclePanesForward()
-					}
-				} else {
-					if isBackward {
-						// Shift+Tab cycles backward
-						a.cyclePanesBackward()
-					} else {
-						a.cyclePanesForward()
-					}
-				}
+				a.handleTabKey(isBackward)
 			}
 			return nil
 		case tcell.KeyRune:
@@ -1101,6 +1034,64 @@ func (a *App) handleDetailsKey(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
+func (a *App) handleTabKey(isBackward bool) {
+	if a.focusedPane == FocusDetails {
+		a.handleDetailsTab(isBackward)
+		return
+	}
+
+	if a.focusedPane == FocusIssues && a.showMyIssues && a.showOtherIssues {
+		a.toggleActiveIssuesSection()
+		a.updateFocus()
+		return
+	}
+
+	if isBackward {
+		a.cyclePanesBackward()
+		return
+	}
+	a.cyclePanesForward()
+}
+
+func (a *App) handleDetailsTab(isBackward bool) {
+	if !a.detailsCommentsVisible {
+		if isBackward {
+			a.cyclePanesBackward()
+		} else {
+			a.cyclePanesForward()
+		}
+		return
+	}
+
+	if !isBackward {
+		// Tab: description -> comments -> next pane.
+		if a.focusedDetailsView {
+			a.focusedDetailsView = false
+			a.cyclePanesForward()
+		} else {
+			a.focusedDetailsView = true
+			a.updateFocus()
+		}
+		return
+	}
+
+	// Shift+Tab: comments -> description -> previous pane.
+	if a.focusedDetailsView {
+		a.focusedDetailsView = false
+		a.updateFocus()
+		return
+	}
+	a.cyclePanesBackward()
+}
+
+func (a *App) toggleActiveIssuesSection() {
+	if a.activeIssuesSection == IssuesSectionMy {
+		a.activeIssuesSection = IssuesSectionOther
+		return
+	}
+	a.activeIssuesSection = IssuesSectionMy
+}
+
 // handlePaletteKey handles keyboard input when palette is open.
 func (a *App) handlePaletteKey(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
@@ -1175,40 +1166,14 @@ func (a *App) handlePaletteKey(event *tcell.EventKey) *tcell.EventKey {
 // When in Issues pane, cycles: My Issues -> Other Issues -> Details
 // Otherwise cycles: Navigation -> Issues -> Details -> Navigation
 func (a *App) cyclePanesForward() {
-	panes := a.visiblePanes()
-	if len(panes) == 0 {
-		return
-	}
-	idx := indexOfPane(panes, a.focusedPane)
-	if idx == -1 {
-		a.focusedPane = panes[0]
-	} else {
-		a.focusedPane = panes[(idx+1)%len(panes)]
-	}
-	if a.focusedPane == FocusIssues {
-		a.ensureIssueFocusVisible()
-	}
-	a.updateFocus()
+	a.cyclePanes(1)
 }
 
 // cyclePanesBackward cycles focus backward through panes.
 // When in Issues pane, cycles: Other Issues -> My Issues -> Navigation
 // Otherwise cycles: Details -> Issues (My Issues preferred) -> Navigation -> Details
 func (a *App) cyclePanesBackward() {
-	panes := a.visiblePanes()
-	if len(panes) == 0 {
-		return
-	}
-	idx := indexOfPane(panes, a.focusedPane)
-	if idx == -1 {
-		a.focusedPane = panes[0]
-	} else {
-		a.focusedPane = panes[(idx-1+len(panes))%len(panes)]
-	}
-	if a.focusedPane == FocusIssues {
-		a.ensureIssueFocusVisible()
-	}
-	a.updateFocus()
+	a.cyclePanes(-1)
 }
 
 func (a *App) visiblePanes() []FocusTarget {
@@ -1224,119 +1189,148 @@ func indexOfPane(panes []FocusTarget, target FocusTarget) int {
 	return -1
 }
 
+func (a *App) cyclePanes(step int) {
+	panes := a.visiblePanes()
+	if len(panes) == 0 {
+		return
+	}
+	idx := indexOfPane(panes, a.focusedPane)
+	if idx == -1 {
+		a.focusedPane = panes[0]
+	} else {
+		offset := step % len(panes)
+		a.focusedPane = panes[(idx+offset+len(panes))%len(panes)]
+	}
+	if a.focusedPane == FocusIssues {
+		a.ensureIssueFocusVisible()
+	}
+	a.updateFocus()
+}
+
+// resetPaneBorders restores all pane borders to the default color.
+func (a *App) resetPaneBorders() {
+	if a.navigationTree != nil {
+		a.navigationTree.SetBorderColor(a.theme.Border)
+	}
+	if a.collapsedNavigation != nil {
+		a.collapsedNavigation.SetBorderColor(a.theme.Border)
+	}
+	if a.myIssuesTable != nil {
+		a.myIssuesTable.SetBorderColor(a.theme.Border)
+	}
+	if a.otherIssuesTable != nil {
+		a.otherIssuesTable.SetBorderColor(a.theme.Border)
+	}
+	if a.collapsedMyIssues != nil {
+		a.collapsedMyIssues.SetBorderColor(a.theme.Border)
+	}
+	if a.collapsedOtherIssues != nil {
+		a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
+	}
+	if a.collapsedIssues != nil {
+		a.collapsedIssues.SetBorderColor(a.theme.Border)
+	}
+	if a.detailsDescriptionView != nil {
+		a.detailsDescriptionView.SetBorderColor(a.theme.Border)
+	}
+	if a.detailsCommentsView != nil {
+		a.detailsCommentsView.SetBorderColor(a.theme.Border)
+	}
+}
+
 // updateFocus updates the focus state of all panes.
 func (a *App) updateFocus() {
+	a.resetPaneBorders()
 	switch a.focusedPane {
 	case FocusNavigation:
-		if a.showNavigation {
-			a.app.SetFocus(a.navigationTree)
-			a.navigationTree.SetBorderColor(a.theme.BorderFocus)
-			a.collapsedNavigation.SetBorderColor(a.theme.Border)
-		} else {
-			a.app.SetFocus(a.collapsedNavigation)
-			a.collapsedNavigation.SetBorderColor(a.theme.BorderFocus)
-		}
-		a.myIssuesTable.SetBorderColor(a.theme.Border)
-		a.otherIssuesTable.SetBorderColor(a.theme.Border)
-		if a.collapsedMyIssues != nil {
-			a.collapsedMyIssues.SetBorderColor(a.theme.Border)
-		}
-		if a.collapsedOtherIssues != nil {
-			a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
-		}
-		a.collapsedIssues.SetBorderColor(a.theme.Border)
-		a.detailsDescriptionView.SetBorderColor(a.theme.Border)
-		a.detailsCommentsView.SetBorderColor(a.theme.Border)
-		// Update all pane titles
-		a.updateAllPaneTitles()
+		a.focusNavigationPane()
 	case FocusIssues:
-		// Focus the active issues section if visible
-		if a.showMyIssues && a.activeIssuesSection == IssuesSectionMy {
-			a.app.SetFocus(a.myIssuesTable)
-			a.myIssuesTable.SetBorderColor(a.theme.BorderFocus)
-			a.otherIssuesTable.SetBorderColor(a.theme.Border)
-			a.collapsedIssues.SetBorderColor(a.theme.Border)
-		} else if !a.showMyIssues && a.activeIssuesSection == IssuesSectionMy && a.collapsedMyIssues != nil {
-			a.app.SetFocus(a.collapsedMyIssues)
-			a.collapsedMyIssues.SetBorderColor(a.theme.BorderFocus)
-			a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
-			a.collapsedIssues.SetBorderColor(a.theme.Border)
-		} else if a.showOtherIssues {
-			a.app.SetFocus(a.otherIssuesTable)
-			a.myIssuesTable.SetBorderColor(a.theme.Border)
-			a.otherIssuesTable.SetBorderColor(a.theme.BorderFocus)
-			a.activeIssuesSection = IssuesSectionOther
-			a.collapsedIssues.SetBorderColor(a.theme.Border)
-		} else if !a.showOtherIssues && a.activeIssuesSection == IssuesSectionOther && a.collapsedOtherIssues != nil {
-			a.app.SetFocus(a.collapsedOtherIssues)
-			a.collapsedOtherIssues.SetBorderColor(a.theme.BorderFocus)
-			a.collapsedMyIssues.SetBorderColor(a.theme.Border)
-			a.collapsedIssues.SetBorderColor(a.theme.Border)
-		} else if a.showMyIssues {
-			a.app.SetFocus(a.myIssuesTable)
-			a.myIssuesTable.SetBorderColor(a.theme.BorderFocus)
-			a.otherIssuesTable.SetBorderColor(a.theme.Border)
-			a.activeIssuesSection = IssuesSectionMy
-			a.collapsedIssues.SetBorderColor(a.theme.Border)
-		} else {
-			a.app.SetFocus(a.collapsedIssues)
-			a.collapsedIssues.SetBorderColor(a.theme.BorderFocus)
-			a.collapsedNavigation.SetBorderColor(a.theme.Border)
-		}
-		// Update all pane titles
-		a.updateAllPaneTitles()
-		a.navigationTree.SetBorderColor(a.theme.Border)
-		a.detailsDescriptionView.SetBorderColor(a.theme.Border)
-		a.detailsCommentsView.SetBorderColor(a.theme.Border)
+		a.focusIssuesPane()
 	case FocusDetails:
-		// Focus the appropriate sub-view based on state
-		if !a.detailsCommentsVisible {
-			a.focusedDetailsView = false
-		}
-		if a.focusedDetailsView && a.detailsCommentsVisible {
-			a.app.SetFocus(a.detailsCommentsView)
-			a.detailsDescriptionView.SetBorderColor(a.theme.Border)
-			a.detailsCommentsView.SetBorderColor(a.theme.BorderFocus)
-		} else {
-			a.app.SetFocus(a.detailsDescriptionView)
-			a.detailsDescriptionView.SetBorderColor(a.theme.BorderFocus)
-			a.detailsCommentsView.SetBorderColor(a.theme.Border)
-		}
-		a.navigationTree.SetBorderColor(a.theme.Border)
-		a.myIssuesTable.SetBorderColor(a.theme.Border)
-		a.otherIssuesTable.SetBorderColor(a.theme.Border)
-		if a.collapsedMyIssues != nil {
-			a.collapsedMyIssues.SetBorderColor(a.theme.Border)
-		}
-		if a.collapsedOtherIssues != nil {
-			a.collapsedOtherIssues.SetBorderColor(a.theme.Border)
-		}
-		a.collapsedNavigation.SetBorderColor(a.theme.Border)
-		a.collapsedIssues.SetBorderColor(a.theme.Border)
-		// Update all pane titles
-		a.updateAllPaneTitles()
+		a.focusDetailsPane()
 	case FocusPalette:
-		a.app.SetFocus(a.paletteInput)
-		a.navigationTree.SetBorderColor(a.theme.Border)
-		a.myIssuesTable.SetBorderColor(a.theme.Border)
-		a.otherIssuesTable.SetBorderColor(a.theme.Border)
-		a.detailsDescriptionView.SetBorderColor(a.theme.Border)
-		a.detailsCommentsView.SetBorderColor(a.theme.Border)
-		// Update all pane titles
-		a.updateAllPaneTitles()
+		a.focusPalettePane()
 	}
+	a.updateAllPaneTitles()
 	a.updateStatusBar()
+}
+
+func (a *App) focusNavigationPane() {
+	if a.showNavigation && a.navigationTree != nil {
+		a.app.SetFocus(a.navigationTree)
+		a.navigationTree.SetBorderColor(a.theme.BorderFocus)
+		return
+	}
+	if a.collapsedNavigation != nil {
+		a.app.SetFocus(a.collapsedNavigation)
+		a.collapsedNavigation.SetBorderColor(a.theme.BorderFocus)
+	}
+}
+
+func (a *App) focusIssuesPane() {
+	// Focus the active issues section if visible.
+	if a.showMyIssues && a.activeIssuesSection == IssuesSectionMy {
+		a.app.SetFocus(a.myIssuesTable)
+		a.myIssuesTable.SetBorderColor(a.theme.BorderFocus)
+		return
+	}
+	if !a.showMyIssues && a.activeIssuesSection == IssuesSectionMy && a.collapsedMyIssues != nil {
+		a.app.SetFocus(a.collapsedMyIssues)
+		a.collapsedMyIssues.SetBorderColor(a.theme.BorderFocus)
+		return
+	}
+	if a.showOtherIssues {
+		a.app.SetFocus(a.otherIssuesTable)
+		a.otherIssuesTable.SetBorderColor(a.theme.BorderFocus)
+		a.activeIssuesSection = IssuesSectionOther
+		return
+	}
+	if !a.showOtherIssues && a.activeIssuesSection == IssuesSectionOther && a.collapsedOtherIssues != nil {
+		a.app.SetFocus(a.collapsedOtherIssues)
+		a.collapsedOtherIssues.SetBorderColor(a.theme.BorderFocus)
+		return
+	}
+	if a.showMyIssues {
+		a.app.SetFocus(a.myIssuesTable)
+		a.myIssuesTable.SetBorderColor(a.theme.BorderFocus)
+		a.activeIssuesSection = IssuesSectionMy
+		return
+	}
+	if a.collapsedIssues != nil {
+		a.app.SetFocus(a.collapsedIssues)
+		a.collapsedIssues.SetBorderColor(a.theme.BorderFocus)
+	}
+}
+
+func (a *App) focusDetailsPane() {
+	if !a.detailsCommentsVisible {
+		a.focusedDetailsView = false
+	}
+	if a.focusedDetailsView && a.detailsCommentsVisible && a.detailsCommentsView != nil {
+		a.app.SetFocus(a.detailsCommentsView)
+		a.detailsCommentsView.SetBorderColor(a.theme.BorderFocus)
+		return
+	}
+	if a.detailsDescriptionView != nil {
+		a.app.SetFocus(a.detailsDescriptionView)
+		a.detailsDescriptionView.SetBorderColor(a.theme.BorderFocus)
+	}
+}
+
+func (a *App) focusPalettePane() {
+	if a.paletteInput == nil {
+		return
+	}
+	a.app.SetFocus(a.paletteInput)
 }
 
 // updateAllPaneTitles updates all pane titles with visual indicators for the active pane.
 func (a *App) updateAllPaneTitles() {
 	// Update Navigation pane title
 	if a.focusedPane == FocusNavigation && a.showNavigation {
-		a.navigationTree.SetTitle(" ▶ Navigation ")
-		a.navigationTree.SetTitleColor(a.theme.Accent)
+		a.setPaneTitle(a.navigationTree, "Navigation", true)
 	} else if a.showNavigation {
-		a.navigationTree.SetTitle(" Navigation ")
-		a.navigationTree.SetTitleColor(a.theme.Foreground)
+		a.setPaneTitle(a.navigationTree, "Navigation", false)
 	}
 
 	// Update Issues pane titles
@@ -1345,58 +1339,65 @@ func (a *App) updateAllPaneTitles() {
 	// Update My Issues table title
 	if a.showMyIssues {
 		if isIssuesFocused && a.activeIssuesSection == IssuesSectionMy {
-			// Active section: add visual indicator and accent color
-			a.myIssuesTable.SetTitle(" ▶ My Issues ")
-			a.myIssuesTable.SetTitleColor(a.theme.Accent)
+			a.setPaneTitle(a.myIssuesTable, "My Issues", true)
 		} else {
-			// Inactive section: normal title
-			a.myIssuesTable.SetTitle(" My Issues ")
-			a.myIssuesTable.SetTitleColor(a.theme.Foreground)
+			a.setPaneTitle(a.myIssuesTable, "My Issues", false)
 		}
 	}
 
 	// Update Other Issues table title
 	if a.showOtherIssues {
 		if isIssuesFocused && a.activeIssuesSection == IssuesSectionOther {
-			// Active section: add visual indicator and accent color
-			a.otherIssuesTable.SetTitle(" ▶ Other Issues ")
-			a.otherIssuesTable.SetTitleColor(a.theme.Accent)
+			a.setPaneTitle(a.otherIssuesTable, "Other Issues", true)
 		} else {
-			// Inactive section: normal title
-			a.otherIssuesTable.SetTitle(" Other Issues ")
-			a.otherIssuesTable.SetTitleColor(a.theme.Foreground)
+			a.setPaneTitle(a.otherIssuesTable, "Other Issues", false)
 		}
 	}
 
 	// Update Details pane titles
 	isDetailsFocused := a.focusedPane == FocusDetails
-	if a.detailsDescriptionView != nil {
-		if isDetailsFocused {
-			// Details pane is focused - show indicator on active sub-view
-			if a.focusedDetailsView && a.detailsCommentsVisible && a.detailsCommentsView != nil {
-				// Comments view is active
-				a.detailsDescriptionView.SetTitle(" Details ")
-				a.detailsDescriptionView.SetTitleColor(a.theme.Foreground)
-				a.detailsCommentsView.SetTitle(" ▶ Comments ")
-				a.detailsCommentsView.SetTitleColor(a.theme.Accent)
-			} else {
-				// Description view is active
-				a.detailsDescriptionView.SetTitle(" ▶ Details ")
-				a.detailsDescriptionView.SetTitleColor(a.theme.Accent)
-				if a.detailsCommentsVisible && a.detailsCommentsView != nil {
-					a.detailsCommentsView.SetTitle(" Comments ")
-					a.detailsCommentsView.SetTitleColor(a.theme.Foreground)
-				}
-			}
-		} else {
-			// Details pane is not focused - reset both titles
-			a.detailsDescriptionView.SetTitle(" Details ")
-			a.detailsDescriptionView.SetTitleColor(a.theme.Foreground)
-			if a.detailsCommentsView != nil {
-				a.detailsCommentsView.SetTitle(" Comments ")
-				a.detailsCommentsView.SetTitleColor(a.theme.Foreground)
-			}
+	a.updateDetailsTitles(isDetailsFocused)
+}
+
+type titledPane interface {
+	SetTitle(string) *tview.Box
+	SetTitleColor(tcell.Color) *tview.Box
+}
+
+func (a *App) setPaneTitle(pane titledPane, title string, focused bool) {
+	if pane == nil {
+		return
+	}
+	if focused {
+		pane.SetTitle(" ▶ " + title + " ")
+		pane.SetTitleColor(a.theme.Accent)
+		return
+	}
+	pane.SetTitle(" " + title + " ")
+	pane.SetTitleColor(a.theme.Foreground)
+}
+
+func (a *App) updateDetailsTitles(isFocused bool) {
+	if a.detailsDescriptionView == nil {
+		return
+	}
+	if !isFocused {
+		a.setPaneTitle(a.detailsDescriptionView, "Details", false)
+		if a.detailsCommentsView != nil {
+			a.setPaneTitle(a.detailsCommentsView, "Comments", false)
 		}
+		return
+	}
+
+	if a.focusedDetailsView && a.detailsCommentsVisible && a.detailsCommentsView != nil {
+		a.setPaneTitle(a.detailsDescriptionView, "Details", false)
+		a.setPaneTitle(a.detailsCommentsView, "Comments", true)
+		return
+	}
+
+	a.setPaneTitle(a.detailsDescriptionView, "Details", true)
+	if a.detailsCommentsVisible && a.detailsCommentsView != nil {
+		a.setPaneTitle(a.detailsCommentsView, "Comments", false)
 	}
 }
 
@@ -1773,16 +1774,19 @@ func compareCustomSort(field config.CustomViewSortField, left linearapi.Issue, r
 	}
 }
 
+var statusOrder = map[string]int{
+	"in review":   0,
+	"in progress": 1,
+	"to do":       2,
+	"todo":        2,
+	"backlog":     3,
+}
+
+const collapsedIssuesHeight = 3
+
 func compareStatusByName(left string, right string) int {
-	order := map[string]int{
-		"in review":   0,
-		"in progress": 1,
-		"to do":       2,
-		"todo":        2,
-		"backlog":     3,
-	}
-	li, lok := order[strings.ToLower(strings.TrimSpace(left))]
-	ri, rok := order[strings.ToLower(strings.TrimSpace(right))]
+	li, lok := statusOrder[strings.ToLower(strings.TrimSpace(left))]
+	ri, rok := statusOrder[strings.ToLower(strings.TrimSpace(right))]
 	if lok && rok {
 		if li < ri {
 			return -1
@@ -1806,18 +1810,10 @@ func (a *App) updateIssuesColumnLayout() {
 	a.issuesColumn.Clear()
 
 	// Add My Issues table or collapsed placeholder.
-	if a.showMyIssues {
-		a.issuesColumn.AddItem(a.myIssuesTable, 0, 1, false)
-	} else if a.collapsedMyIssues != nil {
-		a.issuesColumn.AddItem(a.collapsedMyIssues, 3, 0, false)
-	}
+	a.addIssuesPane(a.showMyIssues, a.myIssuesTable, a.collapsedMyIssues)
 
 	// Add Other Issues table or collapsed placeholder.
-	if a.showOtherIssues {
-		a.issuesColumn.AddItem(a.otherIssuesTable, 0, 1, false)
-	} else if a.collapsedOtherIssues != nil {
-		a.issuesColumn.AddItem(a.collapsedOtherIssues, 3, 0, false)
-	}
+	a.addIssuesPane(a.showOtherIssues, a.otherIssuesTable, a.collapsedOtherIssues)
 
 	if a.issuesColumn.GetItemCount() == 0 {
 		a.issuesColumn.AddItem(a.issuesEmptyView, 0, 1, false)
@@ -1827,22 +1823,26 @@ func (a *App) updateIssuesColumnLayout() {
 	a.updateAllPaneTitles()
 }
 
+func (a *App) addIssuesPane(show bool, table *tview.Table, collapsed *tview.TextView) {
+	if show && table != nil {
+		a.issuesColumn.AddItem(table, 0, 1, false)
+		return
+	}
+	if collapsed != nil {
+		a.issuesColumn.AddItem(collapsed, collapsedIssuesHeight, 0, false)
+	}
+}
+
 // updateIssuesData updates the UI with new issues data.
 // If issueID is provided, that issue will be selected if found in the list.
 func (a *App) updateIssuesData(issues []linearapi.Issue, issueID ...string) {
 	a.issuesMu.Lock()
 	a.issues = issues
 	a.sortIssuesForSelection(a.issues)
-
-	// Determine target issue ID
-	var targetIssueID string
-	if len(issueID) > 0 && issueID[0] != "" {
-		targetIssueID = issueID[0]
-	} else if a.selectedIssue != nil {
-		targetIssueID = a.selectedIssue.ID
-	}
+	selectedIssueSnapshot := a.selectedIssue
 	a.issuesMu.Unlock()
 
+	targetIssueID := resolveTargetIssueID(selectedIssueSnapshot, issueID...)
 	selectedIssue := a.rebuildIssuesTables(targetIssueID)
 	if selectedIssue != nil {
 		a.onIssueSelected(*selectedIssue)
@@ -1853,6 +1853,16 @@ func (a *App) updateIssuesData(issues []linearapi.Issue, issueID ...string) {
 		a.updateDetailsView()
 	}
 	a.updateStatusBar()
+}
+
+func resolveTargetIssueID(selectedIssue *linearapi.Issue, issueID ...string) string {
+	if len(issueID) > 0 && issueID[0] != "" {
+		return issueID[0]
+	}
+	if selectedIssue != nil {
+		return selectedIssue.ID
+	}
+	return ""
 }
 
 // rebuildIssuesTables rebuilds issue rows and renders tables, returning the selected issue.
@@ -2880,23 +2890,33 @@ func (a *App) confirmDeleteView(view config.CustomView) {
 }
 
 func (a *App) toggleNavigationPanel() {
-	a.showNavigation = !a.showNavigation
-	a.persistPanelVisibility()
-	a.rebuildContentLayout()
+	a.togglePanel(&a.showNavigation, a.rebuildContentLayout)
 }
 
 func (a *App) toggleMyIssuesPanel() {
-	a.showMyIssues = !a.showMyIssues
-	a.persistPanelVisibility()
-	a.updateIssuesColumnLayout()
-	a.ensureIssueFocusVisible()
+	a.toggleIssuesPanel(&a.showMyIssues)
 }
 
 func (a *App) toggleOtherIssuesPanel() {
-	a.showOtherIssues = !a.showOtherIssues
+	a.toggleIssuesPanel(&a.showOtherIssues)
+}
+
+func (a *App) toggleIssuesPanel(flag *bool) {
+	a.togglePanel(flag, func() {
+		a.updateIssuesColumnLayout()
+		a.ensureIssueFocusVisible()
+	})
+}
+
+func (a *App) togglePanel(flag *bool, after func()) {
+	if flag == nil {
+		return
+	}
+	*flag = !*flag
 	a.persistPanelVisibility()
-	a.updateIssuesColumnLayout()
-	a.ensureIssueFocusVisible()
+	if after != nil {
+		after()
+	}
 }
 
 func (a *App) rebuildContentLayout() {
