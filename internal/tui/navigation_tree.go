@@ -13,8 +13,11 @@ type NavigationNode struct {
 	IsTeam          bool
 	IsProject       bool
 	IsStatus        bool
+	IsCycle         bool
 	StateID         string
 	StateName       string
+	CycleID         string
+	CycleName       string
 	IsCustomView    bool
 	CustomViewID    string
 	IsCustomViewAdd bool
