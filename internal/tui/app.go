@@ -30,66 +30,54 @@ const (
 
 // IssueFilters contains structured filters applied in addition to navigation.
 type IssueFilters struct {
-	AssigneeID   string
-	AssigneeName string
-	LabelIDs     []string
-	LabelNames   []string
-	StateID      string
-	StateName    string
-	ProjectID    string
-	ProjectName  string
-	CycleID      string
-	CycleName    string
-	DueDate      linearapi.DateFilter
-	Estimate     linearapi.NumberFilter
+	TeamIDs       []string
+	TeamNames     []string
+	AssigneeIDs   []string
+	AssigneeNames []string
+	LabelIDs      []string
+	LabelNames    []string
+	StateIDs      []string
+	StateNames    []string
+	ProjectIDs    []string
+	ProjectNames  []string
+	CycleIDs      []string
+	CycleNames    []string
+	DueDate       linearapi.DateFilter
+	Estimate      linearapi.NumberFilter
 }
 
+// Empty reports whether no rich issue filters are active.
 func (f IssueFilters) Empty() bool {
-	return f.AssigneeID == "" &&
+	return len(f.TeamIDs) == 0 &&
+		len(f.AssigneeIDs) == 0 &&
 		len(f.LabelIDs) == 0 &&
-		f.StateID == "" &&
-		f.ProjectID == "" &&
-		f.CycleID == "" &&
+		len(f.StateIDs) == 0 &&
+		len(f.ProjectIDs) == 0 &&
+		len(f.CycleIDs) == 0 &&
 		f.DueDate.Empty() &&
 		f.Estimate.Empty()
 }
 
+// Summary returns the status-bar text for active rich filters.
 func (f IssueFilters) Summary() string {
-	parts := make([]string, 0, 8)
-	if f.AssigneeID != "" {
-		label := f.AssigneeName
-		if label == "" {
-			label = f.AssigneeID
-		}
-		parts = append(parts, "assignee="+label)
+	parts := make([]string, 0, 9)
+	if len(f.TeamIDs) > 0 {
+		parts = append(parts, "team="+formatFilterSummaryValues(f.TeamIDs, f.TeamNames))
+	}
+	if len(f.AssigneeIDs) > 0 {
+		parts = append(parts, "assignee="+formatFilterSummaryValues(f.AssigneeIDs, f.AssigneeNames))
 	}
 	if len(f.LabelIDs) > 0 {
-		labels := f.LabelNames
-		if len(labels) == 0 {
-			labels = f.LabelIDs
-		}
-		parts = append(parts, "labels="+strings.Join(labels, ","))
+		parts = append(parts, "labels="+formatFilterSummaryValues(f.LabelIDs, f.LabelNames))
 	}
-	if f.StateID != "" {
-		label := f.StateName
-		if label == "" {
-			label = f.StateID
-		}
-		parts = append(parts, "status="+label)
+	if len(f.StateIDs) > 0 {
+		parts = append(parts, "status="+formatFilterSummaryValues(f.StateIDs, f.StateNames))
 	}
-	if f.ProjectID != "" {
-		label := f.ProjectName
-		if label == "" {
-			label = f.ProjectID
-		}
-		parts = append(parts, "project="+label)
+	if len(f.ProjectIDs) > 0 {
+		parts = append(parts, "project="+formatFilterSummaryValues(f.ProjectIDs, f.ProjectNames))
 	}
-	if f.CycleID != "" {
-		label := f.CycleName
-		if label == "" {
-			label = f.CycleID
-		}
-		parts = append(parts, "cycle="+label)
+	if len(f.CycleIDs) > 0 {
+		parts = append(parts, "cycle="+formatFilterSummaryValues(f.CycleIDs, f.CycleNames))
 	}
 	if !f.DueDate.Empty() {
 		parts = append(parts, "due="+formatDateFilterSummary(f.DueDate))
@@ -98,6 +86,14 @@ func (f IssueFilters) Summary() string {
 		parts = append(parts, "estimate="+formatNumberFilterSummary(f.Estimate))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// formatFilterSummaryValues joins display labels for multi-value rich filters.
+func formatFilterSummaryValues(ids []string, labels []string) string {
+	if len(labels) > 0 {
+		return strings.Join(labels, ",")
+	}
+	return strings.Join(ids, ",")
 }
 
 func formatDateFilterSummary(filter linearapi.DateFilter) string {
@@ -1936,8 +1932,6 @@ func (a *App) buildFetchParams() linearapi.FetchIssuesParams {
 		return params
 	}
 
-	a.applyRichFiltersToParams(&params)
-
 	// Apply team/project/state filter based on navigation selection
 	if a.selectedNavigation != nil {
 		switch {
@@ -1956,7 +1950,9 @@ func (a *App) buildFetchParams() linearapi.FetchIssuesParams {
 		// If "All Issues", no team/project filter
 	}
 
-	if params.StateID == "" && len(params.StateTypes) == 0 && !a.config.IncludeCompleted {
+	a.applyRichFiltersToParams(&params)
+
+	if params.StateID == "" && len(params.StateIDs) == 0 && len(params.StateTypes) == 0 && !a.config.IncludeCompleted {
 		params.StateTypes = []string{"backlog", "unstarted", "started"}
 	}
 
@@ -1968,21 +1964,32 @@ func (a *App) applyRichFiltersToParams(params *linearapi.FetchIssuesParams) {
 		return
 	}
 	filters := a.richFilters
-	if filters.AssigneeID != "" {
-		params.AssigneeID = filters.AssigneeID
+	if len(filters.TeamIDs) > 0 {
+		params.TeamID = ""
+		params.TeamIDs = append([]string(nil), filters.TeamIDs...)
+		params.ProjectID = ""
+		params.StateID = ""
+		params.CycleID = ""
+	}
+	if len(filters.AssigneeIDs) > 0 {
+		params.AssigneeID = ""
+		params.AssigneeIDs = append([]string(nil), filters.AssigneeIDs...)
 	}
 	if len(filters.LabelIDs) > 0 {
 		params.LabelIDs = append([]string(nil), filters.LabelIDs...)
 	}
-	if filters.StateID != "" {
-		params.StateID = filters.StateID
+	if len(filters.StateIDs) > 0 {
+		params.StateID = ""
+		params.StateIDs = append([]string(nil), filters.StateIDs...)
 		params.StateTypes = nil
 	}
-	if filters.ProjectID != "" {
-		params.ProjectID = filters.ProjectID
+	if len(filters.ProjectIDs) > 0 {
+		params.ProjectID = ""
+		params.ProjectIDs = append([]string(nil), filters.ProjectIDs...)
 	}
-	if filters.CycleID != "" {
-		params.CycleID = filters.CycleID
+	if len(filters.CycleIDs) > 0 {
+		params.CycleID = ""
+		params.CycleIDs = append([]string(nil), filters.CycleIDs...)
 	}
 	if !filters.DueDate.Empty() {
 		params.DueDate = filters.DueDate
@@ -2776,6 +2783,12 @@ func (a *App) GetSelectedIssue() *linearapi.Issue {
 
 // GetSelectedTeamID returns the currently selected team ID, if any.
 func (a *App) GetSelectedTeamID() string {
+	if len(a.richFilters.TeamIDs) == 1 {
+		return a.richFilters.TeamIDs[0]
+	}
+	if len(a.richFilters.TeamIDs) > 1 {
+		return ""
+	}
 	if a.selectedNavigation != nil && a.selectedNavigation.TeamID != "" {
 		return a.selectedNavigation.TeamID
 	}

@@ -452,6 +452,14 @@ func DefaultCommands(app *App) []Command {
 			},
 		},
 		{
+			ID:       "filter_team",
+			Title:    "Filter by team",
+			Keywords: []string{"filter", "team"},
+			Run: func(a *App) {
+				a.showTeamFilter()
+			},
+		},
+		{
 			ID:       "filter_labels",
 			Title:    "Filter by labels",
 			Keywords: []string{"filter", "labels", "tags"},

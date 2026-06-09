@@ -56,6 +56,26 @@ func TestOpenSearchPaletteUsesSearchSpecificChrome(t *testing.T) {
 	}
 }
 
+func TestMultiSelectModalUsesCheckmarksAndVisibleOrder(t *testing.T) {
+	app := newUXTestApp()
+	modal := app.multiSelectModal
+
+	modal.Show("Filter Team", []MultiSelectItem{
+		{ID: "team-b", Label: "BD"},
+		{ID: "team-f", Label: "Founders"},
+		{ID: "team-m", Label: "Management"},
+	}, []string{"team-m", "team-b"}, func(ids []string) {})
+	defer modal.Hide()
+
+	first, _ := modal.list.GetItemText(0)
+	if !strings.Contains(first, "✓ BD") {
+		t.Fatalf("first row = %q, want selected checkmark", first)
+	}
+	if got := strings.Join(modal.selectedIDs(), ","); got != "team-b,team-m" {
+		t.Fatalf("selectedIDs() = %q, want visible item order", got)
+	}
+}
+
 func TestSettingsModalShowsAndBuildsSearchDebounceSetting(t *testing.T) {
 	app := newUXTestApp()
 	app.config.SearchDebounce = 450 * time.Millisecond

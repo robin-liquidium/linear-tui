@@ -102,9 +102,9 @@ func (mm *MultiSelectModal) refreshList() {
 		if idx == currentIdx {
 			focusPrefix = "> "
 		}
-		prefix := "( ) "
+		prefix := "  "
 		if mm.selected[item.ID] {
-			prefix = "(x) "
+			prefix = "✓ "
 		}
 		mm.list.AddItem(focusPrefix+prefix+item.Label, "", 0, nil)
 	}
@@ -129,12 +129,24 @@ func (mm *MultiSelectModal) toggleCurrentItem() {
 	mm.list.SetCurrentItem(idx)
 }
 
+// selectedIDs returns selected item IDs in the visible item order.
 func (mm *MultiSelectModal) selectedIDs() []string {
 	ids := make([]string, 0, len(mm.selected))
-	for id := range mm.selected {
-		ids = append(ids, id)
+	seen := make(map[string]bool, len(mm.selected))
+	for _, item := range mm.items {
+		if mm.selected[item.ID] {
+			ids = append(ids, item.ID)
+			seen[item.ID] = true
+		}
 	}
-	sort.Strings(ids)
+	extras := make([]string, 0)
+	for id := range mm.selected {
+		if !seen[id] {
+			extras = append(extras, id)
+		}
+	}
+	sort.Strings(extras)
+	ids = append(ids, extras...)
 	return ids
 }
 

@@ -213,6 +213,7 @@ func (a *App) clearFilters() {
 
 func (a *App) showFilterIssuesPicker() {
 	items := []PickerItem{
+		{ID: "team", Label: "Team"},
 		{ID: "assignee", Label: "Assignee"},
 		{ID: "labels", Label: "Labels"},
 		{ID: "status", Label: "Status"},
@@ -227,6 +228,8 @@ func (a *App) showFilterIssuesPicker() {
 	a.pickerModal.Show("Filter Issues", items, func(item PickerItem) {
 		a.pickerActive = false
 		switch item.ID {
+		case "team":
+			a.showTeamFilter()
 		case "assignee":
 			a.showAssigneeFilter()
 		case "labels":
@@ -249,11 +252,127 @@ func (a *App) showFilterIssuesPicker() {
 	})
 }
 
+// showTeamFilter opens a picker for workspace teams.
+func (a *App) showTeamFilter() {
+	teams := a.teams
+	if len(teams) > 0 {
+		a.showTeamFilterWithTeams(teams)
+		return
+	}
+
+	go func() {
+		loadedTeams, err := a.cache.GetTeams(context.Background())
+		a.QueueUpdateDraw(func() {
+			if err != nil {
+				a.updateStatusBarWithError(err)
+				return
+			}
+			a.teams = loadedTeams
+			a.showTeamFilterWithTeams(loadedTeams)
+		})
+	}()
+}
+
+// showTeamFilterWithTeams renders the team picker with already loaded teams.
+func (a *App) showTeamFilterWithTeams(teams []linearapi.Team) {
+	items := make([]MultiSelectItem, 0, len(teams))
+	teamNames := make(map[string]string, len(teams))
+	for _, team := range teams {
+		label := team.Name
+		if team.Key != "" {
+			label = fmt.Sprintf("%s (%s)", team.Name, team.Key)
+		}
+		items = append(items, MultiSelectItem{ID: team.ID, Label: label})
+		teamNames[team.ID] = team.Name
+	}
+
+	a.multiSelectModal.Show("Filter Team", items, a.richFilters.TeamIDs, func(ids []string) {
+		a.richFilters.TeamIDs = ids
+		a.richFilters.TeamNames = namesForIDs(ids, teamNames)
+		a.clearTeamScopedFilters()
+		if len(ids) == 1 {
+			a.preloadTeamFilterMetadata(ids[0])
+		}
+		a.applyFiltersAndRefresh("Applied team filters")
+	})
+}
+
+// clearTeamScopedFilters removes filters whose IDs only make sense inside one Linear team.
+func (a *App) clearTeamScopedFilters() {
+	a.richFilters.AssigneeIDs = nil
+	a.richFilters.AssigneeNames = nil
+	a.richFilters.LabelIDs = nil
+	a.richFilters.LabelNames = nil
+	a.richFilters.StateIDs = nil
+	a.richFilters.StateNames = nil
+	a.richFilters.ProjectIDs = nil
+	a.richFilters.ProjectNames = nil
+	a.richFilters.CycleIDs = nil
+	a.richFilters.CycleNames = nil
+}
+
+// preloadTeamFilterMetadata warms the team-specific caches used by follow-up filter pickers.
+func (a *App) preloadTeamFilterMetadata(teamID string) {
+	if teamID == "" {
+		return
+	}
+	go func() {
+		ctx := context.Background()
+		_ = a.cache.PreloadTeamMetadata(ctx, teamID)
+		users, _ := a.cache.GetUsers(ctx, teamID)
+		projects, _ := a.cache.GetProjects(ctx, teamID)
+		states, _ := a.cache.GetWorkflowStates(ctx, teamID)
+		cycles, _ := a.cache.GetCycles(ctx, teamID)
+		sortCyclesForNavigation(cycles)
+		a.QueueUpdateDraw(func() {
+			a.teamUsers = users
+			a.teamProjects = projects
+			a.workflowStates = states
+			a.teamCycles = cycles
+		})
+	}()
+}
+
 func (a *App) showAssigneeFilter() {
-	a.ShowUserPicker(func(userID string) {
-		a.richFilters.AssigneeID = userID
-		a.richFilters.AssigneeName = userDisplayNameByID(a.teamUsers, userID)
-		a.applyFiltersAndRefresh("Applied assignee filter")
+	users := a.teamUsers
+	if len(users) > 0 {
+		a.showAssigneeFilterWithUsers(users)
+		return
+	}
+	teamID := a.GetSelectedTeamID()
+	if teamID == "" {
+		a.updateStatusBarWithError(fmt.Errorf("select exactly one team before filtering assignees"))
+		return
+	}
+	go func() {
+		loadedUsers, err := a.cache.GetUsers(context.Background(), teamID)
+		a.QueueUpdateDraw(func() {
+			if err != nil {
+				a.updateStatusBarWithError(err)
+				return
+			}
+			a.teamUsers = loadedUsers
+			a.showAssigneeFilterWithUsers(loadedUsers)
+		})
+	}()
+}
+
+// showAssigneeFilterWithUsers renders a multi-select assignee filter for loaded users.
+func (a *App) showAssigneeFilterWithUsers(users []linearapi.User) {
+	items := make([]MultiSelectItem, 0, len(users))
+	userNames := make(map[string]string, len(users))
+	for _, user := range users {
+		label := formatUserDisplayName(user)
+		if user.IsMe {
+			label += " (me)"
+		}
+		items = append(items, MultiSelectItem{ID: user.ID, Label: label})
+		userNames[user.ID] = label
+	}
+	a.multiSelectModal.Show("Filter Assignees", items, a.richFilters.AssigneeIDs, func(ids []string) {
+		a.richFilters.AssigneeIDs = ids
+		a.richFilters.AssigneeNames = namesForIDs(ids, userNames)
+		a.applyFiltersAndRefresh("Applied assignee filters")
 	})
 }
 
@@ -288,13 +407,34 @@ func (a *App) showLabelFilter() {
 func (a *App) showStatusFilter() {
 	teamID := a.GetSelectedTeamID()
 	if teamID == "" {
-		a.updateStatusBarWithError(fmt.Errorf("team context is required"))
+		a.updateStatusBarWithError(fmt.Errorf("select exactly one team before filtering statuses"))
 		return
 	}
-	a.ShowStatusPicker(teamID, func(stateID string) {
-		a.richFilters.StateID = stateID
-		a.richFilters.StateName = workflowStateNameByID(a.workflowStates, stateID)
-		a.applyFiltersAndRefresh("Applied status filter")
+	go func() {
+		states, err := a.cache.GetWorkflowStates(context.Background(), teamID)
+		a.QueueUpdateDraw(func() {
+			if err != nil {
+				a.updateStatusBarWithError(err)
+				return
+			}
+			a.workflowStates = states
+			a.showStatusFilterWithStates(states)
+		})
+	}()
+}
+
+// showStatusFilterWithStates renders a multi-select status filter for loaded workflow states.
+func (a *App) showStatusFilterWithStates(states []linearapi.WorkflowState) {
+	items := make([]MultiSelectItem, 0, len(states))
+	stateNames := make(map[string]string, len(states))
+	for _, state := range states {
+		items = append(items, MultiSelectItem{ID: state.ID, Label: state.Name})
+		stateNames[state.ID] = state.Name
+	}
+	a.multiSelectModal.Show("Filter Statuses", items, a.richFilters.StateIDs, func(ids []string) {
+		a.richFilters.StateIDs = ids
+		a.richFilters.StateNames = namesForIDs(ids, stateNames)
+		a.applyFiltersAndRefresh("Applied status filters")
 	})
 }
 
@@ -323,26 +463,65 @@ func (a *App) showProjectFilter() {
 }
 
 func (a *App) showProjectFilterWithProjects(projects []linearapi.Project) {
-	items := make([]PickerItem, 0, len(projects))
+	items := make([]MultiSelectItem, 0, len(projects))
 	projectNames := make(map[string]string, len(projects))
 	for _, project := range projects {
-		items = append(items, PickerItem{ID: project.ID, Label: project.Name})
+		items = append(items, MultiSelectItem{ID: project.ID, Label: project.Name})
 		projectNames[project.ID] = project.Name
 	}
-	a.pickerActive = true
-	a.pickerModal.Show("Filter Project", items, func(item PickerItem) {
-		a.pickerActive = false
-		a.richFilters.ProjectID = item.ID
-		a.richFilters.ProjectName = projectNames[item.ID]
-		a.applyFiltersAndRefresh("Applied project filter")
+	a.multiSelectModal.Show("Filter Projects", items, a.richFilters.ProjectIDs, func(ids []string) {
+		a.richFilters.ProjectIDs = ids
+		a.richFilters.ProjectNames = namesForIDs(ids, projectNames)
+		a.applyFiltersAndRefresh("Applied project filters")
 	})
 }
 
 func (a *App) showCycleFilter() {
-	a.ShowCyclePicker(func(cycleID string) {
-		a.richFilters.CycleID = cycleID
-		a.richFilters.CycleName = cycleNameByID(a.teamCycles, cycleID)
-		a.applyFiltersAndRefresh("Applied cycle filter")
+	cycles := a.teamCycles
+	if len(cycles) > 0 {
+		a.showCycleFilterWithCycles(cycles)
+		return
+	}
+	teamID := a.GetSelectedTeamID()
+	if teamID == "" {
+		a.updateStatusBarWithError(fmt.Errorf("select exactly one team before filtering cycles"))
+		return
+	}
+	go func() {
+		loadedCycles, err := a.cache.GetCycles(context.Background(), teamID)
+		a.QueueUpdateDraw(func() {
+			if err != nil {
+				a.updateStatusBarWithError(err)
+				return
+			}
+			sortCyclesForNavigation(loadedCycles)
+			a.teamCycles = loadedCycles
+			a.showCycleFilterWithCycles(loadedCycles)
+		})
+	}()
+}
+
+// showCycleFilterWithCycles renders a multi-select cycle filter for loaded cycles.
+func (a *App) showCycleFilterWithCycles(cycles []linearapi.Cycle) {
+	items := make([]MultiSelectItem, 0, len(cycles))
+	cycleNames := make(map[string]string, len(cycles))
+	for _, cycle := range cycles {
+		label := cycle.DisplayName()
+		switch {
+		case cycle.IsActive:
+			label += " (active)"
+		case cycle.IsNext:
+			label += " (next)"
+		case cycle.IsPrevious:
+			label += " (previous)"
+		}
+		items = append(items, MultiSelectItem{ID: cycle.ID, Label: label})
+		cycleNames[cycle.ID] = cycle.DisplayName()
+	}
+	a.multiSelectModal.Show("Filter Cycles", items, a.richFilters.CycleIDs, func(ids []string) {
+		a.richFilters.CycleIDs = ids
+		a.richFilters.CycleNames = namesForIDs(ids, cycleNames)
+		a.applyFiltersAndRefresh("Applied cycle filters")
 	})
 }
 
@@ -376,33 +555,6 @@ func (a *App) showTextFilter() {
 		a.searchQuery = strings.TrimSpace(value)
 		a.applyFiltersAndRefresh("Applied text filter")
 	})
-}
-
-func userDisplayNameByID(users []linearapi.User, id string) string {
-	for _, user := range users {
-		if user.ID == id {
-			return formatUserDisplayName(user)
-		}
-	}
-	return id
-}
-
-func workflowStateNameByID(states []linearapi.WorkflowState, id string) string {
-	for _, state := range states {
-		if state.ID == id {
-			return state.Name
-		}
-	}
-	return id
-}
-
-func cycleNameByID(cycles []linearapi.Cycle, id string) string {
-	for _, cycle := range cycles {
-		if cycle.ID == id {
-			return cycle.DisplayName()
-		}
-	}
-	return id
 }
 
 func namesForIDs(ids []string, names map[string]string) []string {

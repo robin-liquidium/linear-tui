@@ -868,6 +868,23 @@ func TestBuildBaseIssueFilter(t *testing.T) {
 			},
 		},
 		{
+			name: "multi id filters",
+			params: FetchIssuesParams{
+				TeamIDs:     []string{"team-1", "team-2"},
+				ProjectIDs:  []string{"project-1", "project-2"},
+				StateIDs:    []string{"state-1", "state-2"},
+				CycleIDs:    []string{"cycle-1", "cycle-2"},
+				AssigneeIDs: []string{"user-1", "user-2"},
+			},
+			want: IssueFilter{
+				"team":     map[string]interface{}{"id": map[string]interface{}{"in": []string{"team-1", "team-2"}}},
+				"project":  map[string]interface{}{"id": map[string]interface{}{"in": []string{"project-1", "project-2"}}},
+				"state":    map[string]interface{}{"id": map[string]interface{}{"in": []string{"state-1", "state-2"}}},
+				"cycle":    map[string]interface{}{"id": map[string]interface{}{"in": []string{"cycle-1", "cycle-2"}}},
+				"assignee": map[string]interface{}{"id": map[string]interface{}{"in": []string{"user-1", "user-2"}}},
+			},
+		},
+		{
 			name: "state type filters when no state id",
 			params: FetchIssuesParams{
 				StateTypes: []string{"backlog", "started"},

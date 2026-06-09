@@ -378,10 +378,15 @@ type IssuePage struct {
 // FetchIssuesParams contains parameters for fetching issues.
 type FetchIssuesParams struct {
 	TeamID             string
+	TeamIDs            []string
 	ProjectID          string
+	ProjectIDs         []string
 	StateID            string
+	StateIDs           []string
 	CycleID            string
+	CycleIDs           []string
 	AssigneeID         string
+	AssigneeIDs        []string
 	LabelID            string
 	LabelIDs           []string
 	ProjectMilestoneID string
@@ -922,19 +927,19 @@ func (c *Client) ListWorkflowStates(ctx context.Context, teamID string) ([]Workf
 // buildBaseIssueFilter builds the base issue filter without search terms.
 func buildBaseIssueFilter(params FetchIssuesParams) IssueFilter {
 	filter := make(IssueFilter)
-	if params.TeamID != "" {
-		filter["team"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.TeamID}}
+	if teamFilter := buildIDRelationFilter(params.TeamID, params.TeamIDs); teamFilter != nil {
+		filter["team"] = teamFilter
 	}
-	if params.ProjectID != "" {
-		filter["project"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.ProjectID}}
+	if projectFilter := buildIDRelationFilter(params.ProjectID, params.ProjectIDs); projectFilter != nil {
+		filter["project"] = projectFilter
 	}
-	if params.StateID != "" {
-		filter["state"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.StateID}}
+	if stateFilter := buildIDRelationFilter(params.StateID, params.StateIDs); stateFilter != nil {
+		filter["state"] = stateFilter
 	} else if len(params.StateTypes) > 0 {
 		filter["state"] = map[string]interface{}{"type": map[string]interface{}{"in": params.StateTypes}}
 	}
-	if params.AssigneeID != "" {
-		filter["assignee"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.AssigneeID}}
+	if assigneeFilter := buildIDRelationFilter(params.AssigneeID, params.AssigneeIDs); assigneeFilter != nil {
+		filter["assignee"] = assigneeFilter
 	}
 	if params.LabelID != "" {
 		filter["labels"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.LabelID}}
@@ -942,19 +947,51 @@ func buildBaseIssueFilter(params FetchIssuesParams) IssueFilter {
 	if params.DueWithinDays > 0 {
 		filter["dueDate"] = map[string]interface{}{"lt": fmt.Sprintf("P%dD", params.DueWithinDays)}
 	}
-	if params.CycleID != "" {
-		filter["cycle"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.CycleID}}
+	if cycleFilter := buildIDRelationFilter(params.CycleID, params.CycleIDs); cycleFilter != nil {
+		filter["cycle"] = cycleFilter
 	}
 	return filter
+}
+
+// buildIDRelationFilter builds a Linear relation filter using eq for one ID and in for many IDs.
+func buildIDRelationFilter(singleID string, ids []string) map[string]interface{} {
+	values := normalizedFilterIDs(singleID, ids)
+	switch len(values) {
+	case 0:
+		return nil
+	case 1:
+		return map[string]interface{}{"id": map[string]interface{}{"eq": values[0]}}
+	default:
+		return map[string]interface{}{"id": map[string]interface{}{"in": values}}
+	}
+}
+
+// normalizedFilterIDs returns trimmed, deduplicated IDs while preserving caller order.
+func normalizedFilterIDs(singleID string, ids []string) []string {
+	values := make([]string, 0, len(ids)+1)
+	seen := make(map[string]bool, len(ids)+1)
+	if len(ids) == 0 {
+		singleID = strings.TrimSpace(singleID)
+		if singleID != "" {
+			values = append(values, singleID)
+		}
+		return values
+	}
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		values = append(values, id)
+	}
+	return values
 }
 
 // buildStructuredIssueFilter builds issue filters that can be passed alongside
 // Linear's full-text search term.
 func buildStructuredIssueFilter(params FetchIssuesParams) IssueFilter {
 	filter := buildBaseIssueFilter(params)
-	if params.AssigneeID != "" {
-		filter["assignee"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.AssigneeID}}
-	}
 	if params.ProjectMilestoneID != "" {
 		filter["projectMilestone"] = map[string]interface{}{"id": map[string]interface{}{"eq": params.ProjectMilestoneID}}
 	}

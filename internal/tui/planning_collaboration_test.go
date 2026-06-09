@@ -117,12 +117,14 @@ func TestRefreshIssues_AppliesRichFiltersWithNavigationAndSearch(t *testing.T) {
 	estimate := 3.0
 	app.searchQuery = "database"
 	app.richFilters = IssueFilters{
-		AssigneeID: "user-1",
-		LabelIDs:   []string{"label-1", "label-2"},
-		StateID:    "state-1",
-		CycleID:    "cycle-1",
-		DueDate:    linearapi.DateFilter{Eq: "2026-06-15"},
-		Estimate:   linearapi.NumberFilter{Eq: &estimate},
+		TeamIDs:     []string{"team-2", "team-3"},
+		AssigneeIDs: []string{"user-1", "user-2"},
+		LabelIDs:    []string{"label-1", "label-2"},
+		StateIDs:    []string{"state-1", "state-2"},
+		ProjectIDs:  []string{"project-2"},
+		CycleIDs:    []string{"cycle-1", "cycle-2"},
+		DueDate:     linearapi.DateFilter{Eq: "2026-06-15"},
+		Estimate:    linearapi.NumberFilter{Eq: &estimate},
 	}
 	app.selectedNavigation = &NavigationNode{
 		ID:        "project-1",
@@ -144,20 +146,23 @@ func TestRefreshIssues_AppliesRichFiltersWithNavigationAndSearch(t *testing.T) {
 
 	select {
 	case params := <-called:
-		if params.TeamID != "team-1" || params.ProjectID != "project-1" {
-			t.Fatalf("navigation params = team %q project %q, want team-1 project-1", params.TeamID, params.ProjectID)
+		if params.TeamID != "" || strings.Join(params.TeamIDs, ",") != "team-2,team-3" {
+			t.Fatalf("team filter params = team %q teams %#v, want team IDs", params.TeamID, params.TeamIDs)
+		}
+		if params.ProjectID != "" || strings.Join(params.ProjectIDs, ",") != "project-2" {
+			t.Fatalf("project filters = %q/%#v, want rich project IDs only", params.ProjectID, params.ProjectIDs)
 		}
 		if params.Search != "database" {
 			t.Fatalf("Search = %q, want database", params.Search)
 		}
-		if params.AssigneeID != "user-1" {
-			t.Fatalf("AssigneeID = %q, want user-1", params.AssigneeID)
+		if strings.Join(params.AssigneeIDs, ",") != "user-1,user-2" {
+			t.Fatalf("AssigneeIDs = %#v, want user-1,user-2", params.AssigneeIDs)
 		}
 		if strings.Join(params.LabelIDs, ",") != "label-1,label-2" {
 			t.Fatalf("LabelIDs = %#v, want label-1,label-2", params.LabelIDs)
 		}
-		if params.StateID != "state-1" || params.CycleID != "cycle-1" {
-			t.Fatalf("state/cycle = %q/%q, want state-1/cycle-1", params.StateID, params.CycleID)
+		if strings.Join(params.StateIDs, ",") != "state-1,state-2" || strings.Join(params.CycleIDs, ",") != "cycle-1,cycle-2" {
+			t.Fatalf("state/cycle IDs = %#v/%#v, want multi IDs", params.StateIDs, params.CycleIDs)
 		}
 		if params.DueDate.Eq != "2026-06-15" {
 			t.Fatalf("DueDate = %#v, want eq 2026-06-15", params.DueDate)
@@ -169,6 +174,32 @@ func TestRefreshIssues_AppliesRichFiltersWithNavigationAndSearch(t *testing.T) {
 		t.Fatal("timed out waiting for fetchIssuesPage")
 	}
 	waitForRefreshCompletion(t, refreshDone)
+}
+
+func TestIssueFilters_TeamSummaryAndSelectedTeamContext(t *testing.T) {
+	app := NewApp(&linearapi.Client{}, config.Config{PageSize: 1, CacheTTL: time.Minute}, nil)
+	app.richFilters = IssueFilters{
+		TeamIDs:   []string{"team-1"},
+		TeamNames: []string{"Platform"},
+	}
+	app.selectedNavigation = &NavigationNode{
+		TeamID: "team-2",
+	}
+
+	if app.richFilters.Empty() {
+		t.Fatal("team filter should make IssueFilters non-empty")
+	}
+	if got := app.richFilters.Summary(); got != "team=Platform" {
+		t.Fatalf("Summary() = %q, want team=Platform", got)
+	}
+	if got := app.GetSelectedTeamID(); got != "team-1" {
+		t.Fatalf("GetSelectedTeamID() = %q, want rich filter team", got)
+	}
+
+	app.richFilters.TeamIDs = []string{"team-1", "team-3"}
+	if got := app.GetSelectedTeamID(); got != "" {
+		t.Fatalf("GetSelectedTeamID() = %q, want empty for multi-team filter", got)
+	}
 }
 
 func TestDefaultCommands_IncludesPlanningCommandsWithoutReactions(t *testing.T) {
@@ -185,7 +216,7 @@ func TestDefaultCommands_IncludesPlanningCommandsWithoutReactions(t *testing.T) 
 	for _, id := range []string{
 		"set_due_date", "clear_due_date", "edit_estimate", "clear_estimate",
 		"list_project_milestones", "set_milestone", "clear_milestone",
-		"filter_issues", "clear_filters", "filter_assignee", "filter_labels",
+		"filter_issues", "clear_filters", "filter_team", "filter_assignee", "filter_labels",
 		"filter_status", "filter_project", "filter_cycle", "filter_due_date",
 		"filter_estimate", "filter_text",
 		"add_issue_relation", "remove_issue_relation", "subscribe_issue", "unsubscribe_issue",
