@@ -12,46 +12,52 @@ import (
 
 // SettingsFile represents the on-disk JSON with optional fields.
 type SettingsFile struct {
-	APIEndpoint      *string `json:"api_endpoint"`
-	Timeout          *string `json:"timeout"`
-	PageSize         *int    `json:"page_size"`
-	CacheTTL         *string `json:"cache_ttl"`
-	SearchDebounce   *string `json:"search_debounce"`
-	LogFile          *string `json:"log_file"`
-	LogLevel         *string `json:"log_level"`
-	Theme            *string `json:"theme"`
-	Density          *string `json:"density"`
-	AgentProvider    *string `json:"agent_provider"`
-	AgentSandbox     *string `json:"agent_sandbox"`
-	AgentModel       *string `json:"agent_model"`
-	AgentWorkspace   *string `json:"agent_workspace"`
-	IncludeCompleted *bool   `json:"include_completed"`
-	ShowNavigation   *bool   `json:"show_navigation"`
-	ShowMyIssues     *bool   `json:"show_my_issues"`
-	ShowOtherIssues  *bool   `json:"show_other_issues"`
-	LinearAPIKey     *string `json:"linear_api_key"`
+	APIEndpoint      *string              `json:"api_endpoint"`
+	Timeout          *string              `json:"timeout"`
+	PageSize         *int                 `json:"page_size"`
+	CacheTTL         *string              `json:"cache_ttl"`
+	SearchDebounce   *string              `json:"search_debounce"`
+	LogFile          *string              `json:"log_file"`
+	LogLevel         *string              `json:"log_level"`
+	Theme            *string              `json:"theme"`
+	Density          *string              `json:"density"`
+	AgentProvider    *string              `json:"agent_provider"`
+	AgentSandbox     *string              `json:"agent_sandbox"`
+	AgentModel       *string              `json:"agent_model"`
+	AgentWorkspace   *string              `json:"agent_workspace"`
+	IncludeCompleted *bool                `json:"include_completed"`
+	ShowNavigation   *bool                `json:"show_navigation"`
+	ShowMyIssues     *bool                `json:"show_my_issues"`
+	ShowOtherIssues  *bool                `json:"show_other_issues"`
+	IssueSearchQuery *string              `json:"issue_search_query"`
+	IssueSort        *string              `json:"issue_sort"`
+	IssueFilters     *IssueFilterSettings `json:"issue_filters"`
+	LinearAPIKey     *string              `json:"linear_api_key"`
 }
 
 // Settings contains concrete settings values for UI and persistence.
 type Settings struct {
-	APIEndpoint      string `json:"api_endpoint"`
-	Timeout          string `json:"timeout"`
-	PageSize         int    `json:"page_size"`
-	CacheTTL         string `json:"cache_ttl"`
-	SearchDebounce   string `json:"search_debounce"`
-	LogFile          string `json:"log_file"`
-	LogLevel         string `json:"log_level"`
-	Theme            string `json:"theme"`
-	Density          string `json:"density"`
-	AgentProvider    string `json:"agent_provider"`
-	AgentSandbox     string `json:"agent_sandbox"`
-	AgentModel       string `json:"agent_model"`
-	AgentWorkspace   string `json:"agent_workspace"`
-	IncludeCompleted bool   `json:"include_completed"`
-	ShowNavigation   bool   `json:"show_navigation"`
-	ShowMyIssues     bool   `json:"show_my_issues"`
-	ShowOtherIssues  bool   `json:"show_other_issues"`
-	LinearAPIKey     string `json:"linear_api_key"`
+	APIEndpoint      string              `json:"api_endpoint"`
+	Timeout          string              `json:"timeout"`
+	PageSize         int                 `json:"page_size"`
+	CacheTTL         string              `json:"cache_ttl"`
+	SearchDebounce   string              `json:"search_debounce"`
+	LogFile          string              `json:"log_file"`
+	LogLevel         string              `json:"log_level"`
+	Theme            string              `json:"theme"`
+	Density          string              `json:"density"`
+	AgentProvider    string              `json:"agent_provider"`
+	AgentSandbox     string              `json:"agent_sandbox"`
+	AgentModel       string              `json:"agent_model"`
+	AgentWorkspace   string              `json:"agent_workspace"`
+	IncludeCompleted bool                `json:"include_completed"`
+	ShowNavigation   bool                `json:"show_navigation"`
+	ShowMyIssues     bool                `json:"show_my_issues"`
+	ShowOtherIssues  bool                `json:"show_other_issues"`
+	IssueSearchQuery string              `json:"issue_search_query"`
+	IssueSort        string              `json:"issue_sort"`
+	IssueFilters     IssueFilterSettings `json:"issue_filters"`
+	LinearAPIKey     string              `json:"linear_api_key"`
 }
 
 // DefaultSettings returns the default settings for the config file and UI.
@@ -74,6 +80,9 @@ func DefaultSettings() Settings {
 		ShowNavigation:   true,
 		ShowMyIssues:     true,
 		ShowOtherIssues:  true,
+		IssueSearchQuery: "",
+		IssueSort:        "",
+		IssueFilters:     IssueFilterSettings{},
 		LinearAPIKey:     "",
 	}
 }
@@ -98,6 +107,9 @@ func SettingsFromConfig(cfg Config) Settings {
 		ShowNavigation:   cfg.ShowNavigation,
 		ShowMyIssues:     cfg.ShowMyIssues,
 		ShowOtherIssues:  cfg.ShowOtherIssues,
+		IssueSearchQuery: cfg.IssueSearchQuery,
+		IssueSort:        cfg.IssueSort,
+		IssueFilters:     cfg.IssueFilters,
 		LinearAPIKey:     cfg.LinearAPIKey,
 	}
 }
@@ -111,17 +123,20 @@ func ConfigFromSettings(apiKey string, settings Settings) (Config, error) {
 		return Config{}, fmt.Errorf("%s environment variable is not set", LinearAPIKeyEnv)
 	}
 
-	timeout, err := parseDuration(settings.Timeout, "timeout")
+	timeout, err := parseDuration(defaultString(settings.Timeout, DefaultTimeout.String()), "timeout")
+	if err != nil {
+		return Config{}, err
+	}
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+
+	cacheTTL, err := parsePositiveDuration(defaultString(settings.CacheTTL, DefaultCacheTTL.String()), "cache_ttl")
 	if err != nil {
 		return Config{}, err
 	}
 
-	cacheTTL, err := parseDuration(settings.CacheTTL, "cache_ttl")
-	if err != nil {
-		return Config{}, err
-	}
-
-	searchDebounce, err := parsePositiveDuration(settings.SearchDebounce, "search_debounce")
+	searchDebounce, err := parsePositiveDuration(defaultString(settings.SearchDebounce, DefaultSearchDebounce.String()), "search_debounce")
 	if err != nil {
 		return Config{}, err
 	}
@@ -130,54 +145,63 @@ func ConfigFromSettings(apiKey string, settings Settings) (Config, error) {
 		return Config{}, err
 	}
 
-	if err := validateLogLevel(settings.LogLevel, "log_level"); err != nil {
+	logLevel := defaultString(settings.LogLevel, DefaultLogLevel)
+	if err := validateLogLevel(logLevel, "log_level"); err != nil {
 		return Config{}, err
 	}
 
-	theme := strings.TrimSpace(settings.Theme)
-	if theme == "" {
-		theme = DefaultTheme
-	}
+	apiEndpoint := defaultString(settings.APIEndpoint, DefaultAPIEndpoint)
+	theme := defaultString(settings.Theme, DefaultTheme)
 	if err := validateTheme(theme, "theme"); err != nil {
 		return Config{}, err
 	}
 
-	density := strings.TrimSpace(settings.Density)
-	if density == "" {
-		density = DefaultDensity
-	}
+	density := defaultString(settings.Density, DefaultDensity)
 	if err := validateDensity(density, "density"); err != nil {
 		return Config{}, err
 	}
 
-	if err := validateAgentProvider(settings.AgentProvider, "agent_provider"); err != nil {
+	agentProvider := defaultString(settings.AgentProvider, DefaultAgentProvider)
+	if err := validateAgentProvider(agentProvider, "agent_provider"); err != nil {
 		return Config{}, err
 	}
 
-	if err := validateAgentSandbox(settings.AgentSandbox, "agent_sandbox"); err != nil {
+	agentSandbox := defaultString(settings.AgentSandbox, DefaultAgentSandbox)
+	if err := validateAgentSandbox(agentSandbox, "agent_sandbox"); err != nil {
 		return Config{}, err
 	}
 
 	return Config{
 		LinearAPIKey:     apiKey,
-		APIEndpoint:      settings.APIEndpoint,
+		APIEndpoint:      apiEndpoint,
 		Timeout:          timeout,
 		PageSize:         settings.PageSize,
 		CacheTTL:         cacheTTL,
 		SearchDebounce:   searchDebounce,
 		LogFile:          settings.LogFile,
-		LogLevel:         settings.LogLevel,
+		LogLevel:         logLevel,
 		Theme:            theme,
 		Density:          density,
-		AgentProvider:    settings.AgentProvider,
-		AgentSandbox:     settings.AgentSandbox,
+		AgentProvider:    agentProvider,
+		AgentSandbox:     agentSandbox,
 		AgentModel:       settings.AgentModel,
 		AgentWorkspace:   settings.AgentWorkspace,
 		IncludeCompleted: settings.IncludeCompleted,
 		ShowNavigation:   settings.ShowNavigation,
 		ShowMyIssues:     settings.ShowMyIssues,
 		ShowOtherIssues:  settings.ShowOtherIssues,
+		IssueSearchQuery: strings.TrimSpace(settings.IssueSearchQuery),
+		IssueSort:        strings.TrimSpace(settings.IssueSort),
+		IssueFilters:     settings.IssueFilters,
 	}, nil
+}
+
+func defaultString(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 // ConfigFilePath returns the default settings file path.
@@ -277,6 +301,15 @@ func LoadSettings(path string) (Settings, error) {
 	}
 	if file.ShowOtherIssues != nil {
 		settings.ShowOtherIssues = *file.ShowOtherIssues
+	}
+	if file.IssueSearchQuery != nil {
+		settings.IssueSearchQuery = *file.IssueSearchQuery
+	}
+	if file.IssueSort != nil {
+		settings.IssueSort = *file.IssueSort
+	}
+	if file.IssueFilters != nil {
+		settings.IssueFilters = *file.IssueFilters
 	}
 	if file.LinearAPIKey != nil {
 		settings.LinearAPIKey = *file.LinearAPIKey

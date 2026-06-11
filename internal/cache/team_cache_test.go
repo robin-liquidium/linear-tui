@@ -241,6 +241,40 @@ func TestTeamCache_GetWorkflowStates_CacheHit(t *testing.T) {
 	}
 }
 
+func TestTeamCache_PeekWorkflowStatesReturnsExpiredData(t *testing.T) {
+	cache := NewTeamCache(nil, 5*time.Minute)
+	teamID := "team-1"
+	cache.states[teamID] = []linearapi.WorkflowState{{ID: "state-1", Name: "Todo"}}
+	cache.statesExpiry[teamID] = time.Now().Add(-time.Hour)
+
+	states, ok := cache.PeekWorkflowStates(teamID)
+	if !ok {
+		t.Fatal("PeekWorkflowStates() ok = false, want stale data to be usable")
+	}
+	if len(states) != 1 || states[0].ID != "state-1" {
+		t.Fatalf("states = %+v, want cached state-1", states)
+	}
+
+	states[0].ID = "mutated"
+	statesAgain, _ := cache.PeekWorkflowStates(teamID)
+	if statesAgain[0].ID != "state-1" {
+		t.Fatalf("PeekWorkflowStates returned mutable cache slice: %+v", statesAgain)
+	}
+}
+
+func TestTeamCache_PrimeWorkflowStatesStoresFreshData(t *testing.T) {
+	cache := NewTeamCache(nil, 5*time.Minute)
+	cache.PrimeWorkflowStates("team-1", []linearapi.WorkflowState{{ID: "state-1", Name: "Todo"}})
+
+	states, ok := cache.PeekWorkflowStates("team-1")
+	if !ok || len(states) != 1 || states[0].ID != "state-1" {
+		t.Fatalf("PeekWorkflowStates() = %+v ok=%v, want primed state", states, ok)
+	}
+	if time.Now().After(cache.statesExpiry["team-1"]) {
+		t.Fatal("PrimeWorkflowStates stored an expired entry")
+	}
+}
+
 func TestTeamCache_InvalidateCycles(t *testing.T) {
 	cache := NewTeamCache(nil, 5*time.Minute)
 	cache.cycles["team-1"] = []linearapi.Cycle{{ID: "cycle-1", Name: "Cycle 1"}}

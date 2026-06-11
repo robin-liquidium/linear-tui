@@ -49,7 +49,7 @@ func BuildIssueRows(issues []linearapi.Issue, expanded map[string]bool) ([]Issue
 	var rows []IssueRow
 
 	for _, issue := range topLevel {
-		// Check if this issue has children in our list
+		// Check for loaded children or Linear child references.
 		children := childrenByParent[issue.ID]
 		hasChildren := len(children) > 0 || len(issue.Children) > 0
 		isExpanded := expanded[issue.ID]
@@ -62,32 +62,65 @@ func BuildIssueRows(issues []linearapi.Issue, expanded map[string]bool) ([]Issue
 			IsExpanded:  isExpanded,
 		})
 
-		// If expanded, add children
+		// If expanded, add loaded children first, then fall back to Linear child refs.
 		if hasChildren && isExpanded {
-			// Use children from our fetched list if available
-			if len(children) > 0 {
-				// Sort children by identifier for consistent ordering
-				sort.Slice(children, func(i, j int) bool {
-					return children[i].Identifier < children[j].Identifier
+			for _, child := range issueChildRows(issue, children, idToIssue) {
+				childHasChildren := len(child.Children) > 0
+				childExpanded := expanded[child.ID]
+				rows = append(rows, IssueRow{
+					IssueID:     child.ID,
+					Level:       1,
+					IsParent:    childHasChildren,
+					HasChildren: childHasChildren,
+					IsExpanded:  childExpanded,
 				})
-
-				for _, child := range children {
-					childHasChildren := len(child.Children) > 0
-					childExpanded := expanded[child.ID]
-
-					rows = append(rows, IssueRow{
-						IssueID:     child.ID,
-						Level:       1,
-						IsParent:    childHasChildren,
-						HasChildren: childHasChildren,
-						IsExpanded:  childExpanded,
-					})
-				}
 			}
 		}
 	}
 
 	return rows, idToIssue
+}
+
+// issueChildRows returns loaded child issues plus lightweight rows for unloaded child refs.
+func issueChildRows(parent *linearapi.Issue, loaded []*linearapi.Issue, idToIssue map[string]*linearapi.Issue) []*linearapi.Issue {
+	children := make([]*linearapi.Issue, 0, maxInt(len(loaded), len(parent.Children)))
+	seen := make(map[string]bool, len(loaded))
+	for _, child := range loaded {
+		if child == nil {
+			continue
+		}
+		children = append(children, child)
+		seen[child.ID] = true
+	}
+	for _, ref := range parent.Children {
+		if ref.ID == "" || seen[ref.ID] {
+			continue
+		}
+		child := issueFromChildRef(parent, ref)
+		idToIssue[child.ID] = &child
+		children = append(children, &child)
+	}
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].Identifier < children[j].Identifier
+	})
+	return children
+}
+
+// issueFromChildRef builds a selectable partial issue from Linear's child reference.
+func issueFromChildRef(parent *linearapi.Issue, ref linearapi.IssueChildRef) linearapi.Issue {
+	return linearapi.Issue{
+		ID:         ref.ID,
+		Identifier: ref.Identifier,
+		Title:      ref.Title,
+		State:      ref.State,
+		StateID:    ref.StateID,
+		TeamID:     parent.TeamID,
+		Parent: &linearapi.IssueRef{
+			ID:         parent.ID,
+			Identifier: parent.Identifier,
+			Title:      parent.Title,
+		},
+	}
 }
 
 // ToggleExpanded toggles the expanded state for an issue.

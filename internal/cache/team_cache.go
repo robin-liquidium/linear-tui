@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -163,6 +164,38 @@ func (c *TeamCache) GetProjects(ctx context.Context, teamID string) ([]linearapi
 // GetWorkflowStates returns cached workflow states for a team or fetches from the API.
 func (c *TeamCache) GetWorkflowStates(ctx context.Context, teamID string) ([]linearapi.WorkflowState, error) {
 	return getCachedOrFetch(ctx, c, teamID, c.states, c.statesExpiry, c.client.ListWorkflowStates)
+}
+
+// PeekWorkflowStates returns cached workflow states, even if they are stale.
+func (c *TeamCache) PeekWorkflowStates(teamID string) ([]linearapi.WorkflowState, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	states, ok := c.states[teamID]
+	if !ok || len(states) == 0 {
+		return nil, false
+	}
+	return append([]linearapi.WorkflowState(nil), states...), true
+}
+
+// PrimeWorkflowStates stores workflow states for a team using the cache TTL.
+func (c *TeamCache) PrimeWorkflowStates(teamID string, states []linearapi.WorkflowState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.states[teamID] = append([]linearapi.WorkflowState(nil), states...)
+	c.statesExpiry[teamID] = time.Now().Add(c.ttl)
+}
+
+// RefreshWorkflowStates fetches workflow states from Linear and replaces the cached value.
+func (c *TeamCache) RefreshWorkflowStates(ctx context.Context, teamID string) ([]linearapi.WorkflowState, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("team cache has no Linear client")
+	}
+	states, err := c.client.ListWorkflowStates(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	c.PrimeWorkflowStates(teamID, states)
+	return states, nil
 }
 
 // GetCycles returns cached cycles for a team or fetches from the API.

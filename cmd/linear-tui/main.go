@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/roeyazroel/linear-tui/internal/config"
@@ -37,21 +38,26 @@ func main() {
 		// Allow launching without an API key; the app will prompt for it.
 		timeout, _ := time.ParseDuration(settings.Timeout)
 		cacheTTL, _ := time.ParseDuration(settings.CacheTTL)
+		searchDebounce, _ := time.ParseDuration(settings.SearchDebounce)
 		if timeout == 0 {
 			timeout = config.DefaultTimeout
 		}
 		if cacheTTL == 0 {
 			cacheTTL = config.DefaultCacheTTL
 		}
+		if searchDebounce == 0 {
+			searchDebounce = config.DefaultSearchDebounce
+		}
 		if settings.PageSize <= 0 {
 			settings.PageSize = config.DefaultPageSize
 		}
 		cfg = config.Config{
-			LinearAPIKey:     "",
+			LinearAPIKey:     strings.TrimSpace(settings.LinearAPIKey),
 			APIEndpoint:      settings.APIEndpoint,
 			Timeout:          timeout,
 			PageSize:         settings.PageSize,
 			CacheTTL:         cacheTTL,
+			SearchDebounce:   searchDebounce,
 			LogFile:          settings.LogFile,
 			LogLevel:         settings.LogLevel,
 			Theme:            settings.Theme,
@@ -64,6 +70,8 @@ func main() {
 			ShowNavigation:   settings.ShowNavigation,
 			ShowMyIssues:     settings.ShowMyIssues,
 			ShowOtherIssues:  settings.ShowOtherIssues,
+			IssueSearchQuery: settings.IssueSearchQuery,
+			IssueFilters:     settings.IssueFilters,
 		}
 	}
 
@@ -117,8 +125,9 @@ func main() {
 		}
 	}
 
-	// Create and run tview application
-	app := tui.NewApp(apiClient, cfg, promptTemplates, customViews, viewsPath)
+	// Create and run Bubble Tea application.
+	app := tui.NewCharmAppWithSettingsPath(apiClient, cfg, customViews, settingsPath, promptTemplates)
+	_ = viewsPath
 
 	if err := app.Run(); err != nil {
 		logger.ErrorWithErr(err, "app.main: application error")

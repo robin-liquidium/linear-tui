@@ -38,6 +38,44 @@ const (
 	DefaultAgentSandbox   = "enabled"
 )
 
+// DateFilterSettings stores a timeless Linear date filter in user settings.
+type DateFilterSettings struct {
+	Eq   string `json:"eq,omitempty"`
+	GT   string `json:"gt,omitempty"`
+	GTE  string `json:"gte,omitempty"`
+	LT   string `json:"lt,omitempty"`
+	LTE  string `json:"lte,omitempty"`
+	Null *bool  `json:"null,omitempty"`
+}
+
+// NumberFilterSettings stores a Linear numeric filter in user settings.
+type NumberFilterSettings struct {
+	Eq   *float64 `json:"eq,omitempty"`
+	GT   *float64 `json:"gt,omitempty"`
+	GTE  *float64 `json:"gte,omitempty"`
+	LT   *float64 `json:"lt,omitempty"`
+	LTE  *float64 `json:"lte,omitempty"`
+	Null *bool    `json:"null,omitempty"`
+}
+
+// IssueFilterSettings stores command-palette issue filters in user settings.
+type IssueFilterSettings struct {
+	TeamIDs       []string             `json:"team_ids,omitempty"`
+	TeamNames     []string             `json:"team_names,omitempty"`
+	AssigneeIDs   []string             `json:"assignee_ids,omitempty"`
+	AssigneeNames []string             `json:"assignee_names,omitempty"`
+	LabelIDs      []string             `json:"label_ids,omitempty"`
+	LabelNames    []string             `json:"label_names,omitempty"`
+	StateIDs      []string             `json:"state_ids,omitempty"`
+	StateNames    []string             `json:"state_names,omitempty"`
+	ProjectIDs    []string             `json:"project_ids,omitempty"`
+	ProjectNames  []string             `json:"project_names,omitempty"`
+	CycleIDs      []string             `json:"cycle_ids,omitempty"`
+	CycleNames    []string             `json:"cycle_names,omitempty"`
+	DueDate       DateFilterSettings   `json:"due_date,omitempty"`
+	Estimate      NumberFilterSettings `json:"estimate,omitempty"`
+}
+
 // getDefaultLogFile returns the default log file path: $HOME/.linear-tui/app.log
 func getDefaultLogFile() string {
 	homeDir, err := os.UserHomeDir()
@@ -99,6 +137,15 @@ type Config struct {
 	ShowNavigation  bool
 	ShowMyIssues    bool
 	ShowOtherIssues bool
+
+	// IssueSearchQuery is the persisted text search applied to issue queries.
+	IssueSearchQuery string
+
+	// IssueSort is the persisted issue ordering selected in the TUI.
+	IssueSort string
+
+	// IssueFilters are the persisted command-palette filters applied to issue queries.
+	IssueFilters IssueFilterSettings
 }
 
 // LoadFromEnv loads configuration from environment variables.
@@ -129,6 +176,9 @@ func LoadFromEnv() (Config, error) {
 		ShowNavigation:   true,
 		ShowMyIssues:     true,
 		ShowOtherIssues:  true,
+		IssueSearchQuery: "",
+		IssueSort:        "",
+		IssueFilters:     IssueFilterSettings{},
 	}
 
 	// Parse optional API endpoint override.

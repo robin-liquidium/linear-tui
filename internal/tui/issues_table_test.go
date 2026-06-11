@@ -77,12 +77,12 @@ func TestRenderIssueRow(t *testing.T) {
 			if len(row) > 1 && row[1] != tt.wantState {
 				t.Errorf("renderIssueRow()[1] = %q, want %q", row[1], tt.wantState)
 			}
-			// Column 2 is now Priority
-			if len(row) > 3 && tt.issue.Assignee == "" && row[3] != "Unassigned" {
-				t.Errorf("renderIssueRow()[3] = %q, want %q", row[3], "Unassigned")
+			// Column 3 is title and column 4 is assignee.
+			if len(row) > 4 && tt.issue.Assignee == "" && row[4] != "Unassigned" {
+				t.Errorf("renderIssueRow()[4] = %q, want %q", row[4], "Unassigned")
 			}
-			if len(row) > 4 && row[4] != tt.wantCycle {
-				t.Errorf("renderIssueRow()[4] = %q, want %q", row[4], tt.wantCycle)
+			if len(row) > 5 && row[5] != tt.wantCycle {
+				t.Errorf("renderIssueRow()[5] = %q, want %q", row[5], tt.wantCycle)
 			}
 		})
 	}
@@ -113,13 +113,13 @@ func TestRenderIssueRow_Truncation(t *testing.T) {
 	}
 
 	// Priority is column 2 (no truncation needed for formatted priority)
-	// Assignee should be truncated to 10 chars (now column 3)
-	if len(row[3]) > 10 {
-		t.Errorf("Assignee length = %d, want <= 10", len(row[3]))
+	// Assignee should be truncated to 10 chars (now column 4)
+	if len(row[4]) > 10 {
+		t.Errorf("Assignee length = %d, want <= 10", len(row[4]))
 	}
 
-	// Cycle should be truncated to 10 chars (now column 4)
-	if len(row[4]) > 10 {
-		t.Errorf("Cycle length = %d, want <= 10", len(row[4]))
+	// Cycle should be truncated to 10 chars (now column 5)
+	if len(row[5]) > 10 {
+		t.Errorf("Cycle length = %d, want <= 10", len(row[5]))
 	}
 }

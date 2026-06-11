@@ -1,6 +1,15 @@
 # linear-tui
 
-A terminal user interface (TUI) for Linear built with Go and tview.
+A terminal user interface (TUI) for Linear built with Go, Bubble Tea, Bubbles, and Lip Gloss.
+
+## Init
+
+```bash
+./install.sh
+lt
+```
+
+This installs `linear-tui` and `lt` to `~/.local/bin`. First run prompts for a Linear API key if one is not already configured.
 
 ## Screenshots
 
@@ -30,7 +39,7 @@ A terminal user interface (TUI) for Linear built with Go and tview.
 - My Issues vs Other Issues sections
 - Agent runs via command palette (Claude or Cursor Agent)
 - Agent prompt templates and streaming output with copy/resume
-- Real-time issue fetching from Linear API
+- Cached issue fetching with manual refresh and hourly auto-refresh
 - Comprehensive logging system for debugging
 - Settings modal with live config updates
 - Themes (linear, high_contrast, color_blind) and density modes
@@ -38,6 +47,7 @@ A terminal user interface (TUI) for Linear built with Go and tview.
 - Clipboard actions (issue ID, issue URL, agent output)
 - Custom views with filters (assignee, status, due date, project, team, label) and two-level sorting
 - Panel toggles and persistence for navigation and issue panes
+- Embedded Google Calendar day pane using the same `gws` auth as `gc`
 
 ## Requirements
 
@@ -96,14 +106,31 @@ brew install roeyazroel/linear-tui/linear-tui
 Requires Go 1.24 or later:
 
 ```bash
+git clone https://github.com/ropl-btc/linear-tui.git
+cd linear-tui
+./install.sh
+```
+
+This installs both commands:
+
+- `linear-tui`
+- `lt`
+
+To install somewhere else, set `PREFIX`:
+
+```bash
+PREFIX=/usr/local ./install.sh
+```
+
+Manual install is still available:
+
+```bash
 go install github.com/roeyazroel/linear-tui/cmd/linear-tui@latest
 ```
 
-Or clone and build locally:
+Or build locally without installing:
 
 ```bash
-git clone https://github.com/roeyazroel/linear-tui.git
-cd linear-tui
 go build ./cmd/linear-tui
 ```
 
@@ -113,25 +140,23 @@ Download pre-built binaries from the [Releases](https://github.com/roeyazroel/li
 
 ## Usage
 
-Set your Linear API key before starting the app.
-
-Set your Linear API key and run the application (or launch and enter the key in-app when prompted):
+Run the application. If no API key is configured yet, the app prompts for one in-app:
 
 ### Homebrew
 
 ```bash
-export LINEAR_API_KEY="your-api-key-here"
 linear-tui
 ```
 
 ### Local Build
 
-If you cloned the repository and built the binary locally, run the local executable:
+If you ran `./install.sh`, use the short command:
 
 ```bash
-export LINEAR_API_KEY="your-api-key-here"
-./linear-tui
+lt
 ```
+
+You can also run `linear-tui`.
 
 ### Advanced Configuration
 
@@ -179,7 +204,7 @@ To disable logging, set `log_file` to an empty string in the settings file or vi
 - `Space` - Toggle expand/collapse sub-issues
 - `Enter` - Select issue / Execute command
 - `Esc` - Close palette / Cancel / Clear search
-- `z` - Collapse/expand focused pane (navigation or issues)
+- `z` / `Ctrl+z` - Undo last optimistic issue edit
 - `q` - Quit
 
 ### Command Palette
@@ -191,25 +216,26 @@ To disable logging, set `log_file` to an empty string in the settings file or vi
 ### Quick Commands
 
 - `r` - Refresh issues
-- `n` - Create new issue
-- `e` - Edit issue title
-- `g` - Edit issue labels
+- `c` - Create new issue
+- `a` - Add comment
 - `s` - Change status
 - `p` - Change priority
-- `a` - Assign to user
-- `m` - Assign to me
-- `u` - Unassign issue
-- `t` - Add comment
-- `o` - Open in browser
-- `y` - Copy issue ID
-- `w` - Copy issue URL
-- `x` - Archive issue
-- `b` - Create sub-issue
-- `p` - View parent issue
-- `i` - Set parent issue
-- `d` - Remove parent
-- `]` - Expand all sub-issues
-- `[` - Collapse all sub-issues
+- `t` - Mark selected issue due today
+- `y` - Copy selected issue URL
+- `:` - Open command palette for all other actions
+
+### Calendar Pane
+
+When the Calendar pane is focused:
+
+- `left` / `h` - Previous day
+- `right` / `l` - Next day
+- `up` / `k` and `down` / `j` - Select event
+- `t` - Today
+- `enter` - Toggle selected event details
+- `delete` / `backspace` - Delete selected event optimistically
+- `r` - Refresh calendar week
+- `Tab` / `Shift+Tab` - Cycle to the next/previous pane
 
 ### Custom Views
 

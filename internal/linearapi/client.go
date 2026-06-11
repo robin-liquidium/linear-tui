@@ -343,6 +343,7 @@ type Issue struct {
 	Assignee         string
 	AssigneeID       string
 	Priority         int
+	SortOrder        float64
 	UpdatedAt        time.Time
 	CreatedAt        time.Time
 	TeamID           string
@@ -490,6 +491,7 @@ type issueMutationNode struct {
 		Name graphql.String
 	}
 	Priority    graphql.Float
+	SortOrder   graphql.Float
 	UpdatedAt   graphql.String
 	CreatedAt   graphql.String
 	Description *graphql.String
@@ -1209,6 +1211,7 @@ func (c *Client) searchIssuesPage(ctx context.Context, params FetchIssuesParams,
 					Name graphql.String
 				}
 				Priority    graphql.Float
+				SortOrder   graphql.Float
 				UpdatedAt   graphql.String
 				CreatedAt   graphql.String
 				Description *graphql.String
@@ -1389,6 +1392,7 @@ func (c *Client) fetchIssuesWithFilterPage(ctx context.Context, params FetchIssu
 					Name graphql.String
 				}
 				Priority    graphql.Float
+				SortOrder   graphql.Float
 				UpdatedAt   graphql.String
 				CreatedAt   graphql.String
 				Description *graphql.String
@@ -1774,6 +1778,7 @@ func (c *Client) parseIssueNode(node interface{}) Issue {
 	createdAt := parseTime(v.FieldByName("CreatedAt").String())
 
 	priority := int(v.FieldByName("Priority").Float())
+	sortOrder := reflectFloatField(v, "SortOrder")
 
 	assignee := ""
 	assigneeID := ""
@@ -1867,6 +1872,7 @@ func (c *Client) parseIssueNode(node interface{}) Issue {
 		Assignee:         assignee,
 		AssigneeID:       assigneeID,
 		Priority:         priority,
+		SortOrder:        sortOrder,
 		UpdatedAt:        updatedAt,
 		CreatedAt:        createdAt,
 		Description:      description,
@@ -1920,6 +1926,7 @@ func (c *Client) FetchIssueByID(ctx context.Context, id string) (Issue, error) {
 				Name graphql.String
 			}
 			Priority    graphql.Float
+			SortOrder   graphql.Float
 			UpdatedAt   graphql.String
 			CreatedAt   graphql.String
 			Description *graphql.String

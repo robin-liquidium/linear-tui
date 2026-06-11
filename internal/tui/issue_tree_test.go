@@ -138,6 +138,42 @@ func TestBuildIssueRows_ExpandedParent(t *testing.T) {
 	}
 }
 
+func TestBuildIssueRows_ExpandedParentWithOnlyChildRefs(t *testing.T) {
+	parent := linearapi.Issue{
+		ID:         "parent-1",
+		Identifier: "LIN-1",
+		Title:      "Parent Issue",
+		TeamID:     "team-1",
+		Children: []linearapi.IssueChildRef{
+			{ID: "child-b", Identifier: "LIN-3", Title: "Child B", State: "Todo"},
+			{ID: "child-a", Identifier: "LIN-2", Title: "Child A", State: "In Progress"},
+		},
+	}
+	expanded := map[string]bool{"parent-1": true}
+
+	rows, idToIssue := BuildIssueRows([]linearapi.Issue{parent}, expanded)
+
+	if len(rows) != 3 {
+		t.Fatalf("BuildIssueRows() expanded child refs returned %d rows, want 3", len(rows))
+	}
+	expectedOrder := []string{"parent-1", "child-a", "child-b"}
+	for i, expected := range expectedOrder {
+		if rows[i].IssueID != expected {
+			t.Fatalf("row %d IssueID = %q, want %q", i, rows[i].IssueID, expected)
+		}
+	}
+	child := idToIssue["child-a"]
+	if child == nil {
+		t.Fatal("idToIssue missing synthetic child ref")
+	}
+	if child.Title != "Child A" || child.State != "In Progress" || child.TeamID != "team-1" {
+		t.Fatalf("synthetic child = %+v, want title/state/team from child ref and parent", child)
+	}
+	if child.Parent == nil || child.Parent.ID != "parent-1" {
+		t.Fatalf("synthetic child parent = %+v, want parent-1", child.Parent)
+	}
+}
+
 func TestBuildIssueRows_OrphanSubIssue(t *testing.T) {
 	// Sub-issue whose parent is not in the fetched list
 	orphan := linearapi.Issue{

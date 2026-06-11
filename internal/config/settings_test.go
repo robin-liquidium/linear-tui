@@ -82,6 +82,125 @@ func TestConfigFromSettingsParsesSearchDebounce(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsPreservesIssueFilters(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsPath := filepath.Join(tmpDir, "config.json")
+
+	data := []byte(`{
+		"issue_search_query": "urgent bugs",
+		"issue_sort": "priority",
+		"issue_filters": {
+			"team_ids": ["team-1"],
+			"team_names": ["Platform"],
+			"assignee_ids": ["user-1"],
+			"assignee_names": ["Robin"],
+			"label_ids": ["label-1"],
+			"label_names": ["Bug"],
+			"state_ids": ["state-1"],
+			"state_names": ["Todo"],
+			"project_ids": ["project-1"],
+			"project_names": ["Launch"],
+			"cycle_ids": ["cycle-1"],
+			"cycle_names": ["Cycle 1"],
+			"due_date": {"eq": "2026-06-15"},
+			"estimate": {"eq": 3}
+		}
+	}`)
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		t.Fatalf("write settings file: %v", err)
+	}
+
+	settings, err := LoadSettings(settingsPath)
+	if err != nil {
+		t.Fatalf("LoadSettings() error: %v", err)
+	}
+
+	expectedEstimate := 3.0
+	if settings.IssueSearchQuery != "urgent bugs" {
+		t.Fatalf("IssueSearchQuery = %q, want urgent bugs", settings.IssueSearchQuery)
+	}
+	if settings.IssueSort != "priority" {
+		t.Fatalf("IssueSort = %q, want priority", settings.IssueSort)
+	}
+	if !reflect.DeepEqual(settings.IssueFilters.TeamIDs, []string{"team-1"}) {
+		t.Fatalf("TeamIDs = %+v, want team-1", settings.IssueFilters.TeamIDs)
+	}
+	if settings.IssueFilters.DueDate.Eq != "2026-06-15" {
+		t.Fatalf("DueDate.Eq = %q, want 2026-06-15", settings.IssueFilters.DueDate.Eq)
+	}
+	if settings.IssueFilters.Estimate.Eq == nil || *settings.IssueFilters.Estimate.Eq != expectedEstimate {
+		t.Fatalf("Estimate.Eq = %+v, want %v", settings.IssueFilters.Estimate.Eq, expectedEstimate)
+	}
+}
+
+func TestConfigFromSettingsCopiesIssueFilters(t *testing.T) {
+	settings := DefaultSettings()
+	settings.IssueSearchQuery = "  open bugs  "
+	settings.IssueSort = "  status  "
+	settings.IssueFilters.TeamIDs = []string{"team-1"}
+
+	cfg, err := ConfigFromSettings("test-key", settings)
+	if err != nil {
+		t.Fatalf("ConfigFromSettings() error: %v", err)
+	}
+
+	if cfg.IssueSearchQuery != "open bugs" {
+		t.Fatalf("IssueSearchQuery = %q, want open bugs", cfg.IssueSearchQuery)
+	}
+	if cfg.IssueSort != "status" {
+		t.Fatalf("IssueSort = %q, want status", cfg.IssueSort)
+	}
+	if !reflect.DeepEqual(cfg.IssueFilters.TeamIDs, []string{"team-1"}) {
+		t.Fatalf("TeamIDs = %+v, want team-1", cfg.IssueFilters.TeamIDs)
+	}
+}
+
+func TestConfigFromSettingsDefaultsBlankOptionalValues(t *testing.T) {
+	settings := DefaultSettings()
+	settings.APIEndpoint = ""
+	settings.Timeout = "0s"
+	settings.CacheTTL = ""
+	settings.SearchDebounce = ""
+	settings.LogLevel = ""
+	settings.Theme = ""
+	settings.Density = ""
+	settings.AgentProvider = ""
+	settings.AgentSandbox = ""
+
+	cfg, err := ConfigFromSettings("test-key", settings)
+	if err != nil {
+		t.Fatalf("ConfigFromSettings() error: %v", err)
+	}
+
+	if cfg.APIEndpoint != DefaultAPIEndpoint {
+		t.Fatalf("APIEndpoint = %q, want %q", cfg.APIEndpoint, DefaultAPIEndpoint)
+	}
+	if cfg.Timeout != DefaultTimeout {
+		t.Fatalf("Timeout = %s, want %s", cfg.Timeout, DefaultTimeout)
+	}
+	if cfg.CacheTTL != DefaultCacheTTL {
+		t.Fatalf("CacheTTL = %s, want %s", cfg.CacheTTL, DefaultCacheTTL)
+	}
+	if cfg.SearchDebounce != DefaultSearchDebounce {
+		t.Fatalf("SearchDebounce = %s, want %s", cfg.SearchDebounce, DefaultSearchDebounce)
+	}
+	if cfg.LogLevel != DefaultLogLevel {
+		t.Fatalf("LogLevel = %q, want %q", cfg.LogLevel, DefaultLogLevel)
+	}
+	if cfg.Theme != DefaultTheme {
+		t.Fatalf("Theme = %q, want %q", cfg.Theme, DefaultTheme)
+	}
+	if cfg.Density != DefaultDensity {
+		t.Fatalf("Density = %q, want %q", cfg.Density, DefaultDensity)
+	}
+	if cfg.AgentProvider != DefaultAgentProvider {
+		t.Fatalf("AgentProvider = %q, want %q", cfg.AgentProvider, DefaultAgentProvider)
+	}
+	if cfg.AgentSandbox != DefaultAgentSandbox {
+		t.Fatalf("AgentSandbox = %q, want %q", cfg.AgentSandbox, DefaultAgentSandbox)
+	}
+}
+
 // TestLoadSettingsPreservesEmptyLogFile ensures an empty log file disables logging.
 func TestLoadSettingsPreservesEmptyLogFile(t *testing.T) {
 	tmpDir := t.TempDir()
