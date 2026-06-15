@@ -7264,6 +7264,7 @@ func (a CharmApp) renderLeftSidebar(width int, height int) string {
 }
 
 func (a CharmApp) renderNavigation(width int, height int) string {
+	contentWidth := paneContentWidth(width)
 	lines := []string{}
 	for i, node := range a.navigation {
 		prefix := "  "
@@ -7282,13 +7283,14 @@ func (a CharmApp) renderNavigation(width int, height int) string {
 		lines = append(lines, a.styles.subtle.Render("Loading teams..."))
 	}
 	bodyHeight := maxInt(1, height-2)
-	body := a.styles.columnBody.Width(width).Height(bodyHeight).Render(strings.Join(lines, "\n"))
+	body := a.styles.columnBody.Width(contentWidth).Height(bodyHeight).Render(strings.Join(lines, "\n"))
 	return a.renderColumn(charmPaneNav, "Navigation", "", width, height, body)
 }
 
 func (a CharmApp) renderCalendar(width int, height int) string {
+	contentWidth := paneContentWidth(width)
 	bodyHeight := maxInt(1, height-2)
-	body := a.styles.columnBody.Width(width).Height(bodyHeight).Render(a.renderCalendarBody(width, bodyHeight))
+	body := a.styles.columnBody.Width(contentWidth).Height(bodyHeight).Render(a.renderCalendarBody(contentWidth, bodyHeight))
 	return a.renderColumn(charmPaneCalendar, "Calendar", a.calendarPaneMeta(), width, height, body)
 }
 
@@ -7386,22 +7388,23 @@ func (a CharmApp) calendarPaneMeta() string {
 }
 
 func (a CharmApp) renderIssues(width int, height int) string {
+	contentWidth := paneContentWidth(width)
 	parts := []string{}
 	if a.cfg.ShowMyIssues && a.cfg.ShowOtherIssues {
-		parts = append(parts, a.renderIssueTabs(width))
+		parts = append(parts, a.renderIssueTabs(contentWidth))
 	}
 	if a.cfg.ShowMyIssues {
 		content := a.renderIssueTable(a.myRows, a.myIssueMap, a.myTable)
-		parts = append(parts, a.renderIssueSection("My Issues", IssuesSectionMy, len(a.myRows), content, width))
+		parts = append(parts, a.renderIssueSection("My Issues", IssuesSectionMy, len(a.myRows), content, contentWidth))
 	}
 	if a.cfg.ShowOtherIssues {
 		content := a.renderIssueTable(a.otherRows, a.otherIssueMap, a.otherTable)
-		parts = append(parts, a.renderIssueSection("Other Issues", IssuesSectionOther, len(a.otherRows), content, width))
+		parts = append(parts, a.renderIssueSection("Other Issues", IssuesSectionOther, len(a.otherRows), content, contentWidth))
 	}
 	if len(parts) == 0 {
 		parts = append(parts, a.styles.subtle.Render("No issue panels visible"))
 	}
-	body := a.styles.columnBody.Width(width).Height(maxInt(1, height-2)).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
+	body := a.styles.columnBody.Width(contentWidth).Height(maxInt(1, height-2)).Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
 	return a.renderColumn(charmPaneIssues, "Issues", a.issueContextText(), width, height, body)
 }
 
@@ -7411,24 +7414,44 @@ func (a CharmApp) loadingIssueText() string {
 }
 
 func (a CharmApp) renderDetails(width int, height int) string {
-	body := a.styles.columnBody.Width(width).Height(maxInt(1, height-2)).Render(a.details.View())
+	contentWidth := paneContentWidth(width)
+	body := a.styles.columnBody.Width(contentWidth).Height(maxInt(1, height-2)).Render(a.details.View())
 	return a.renderColumn(charmPaneDetails, "Details", a.selectedIssueLabel(), width, height, body)
 }
 
-// renderColumn creates a flat Lip Gloss column with a focus-aware heading.
+// paneContentWidth reserves one cell for the focus rail without changing layout width.
+func paneContentWidth(width int) int {
+	return maxInt(1, width-1)
+}
+
+// renderPaneRail returns the left-edge focus affordance for a workspace pane.
+func (a CharmApp) renderPaneRail(pane charmPane, height int) string {
+	style := a.styles.paneRail
+	glyph := " "
+	if a.focusedPane == pane {
+		style = a.styles.paneRailFocused
+		glyph = "┃"
+	}
+	line := strings.Repeat(glyph+"\n", maxInt(0, height-1)) + glyph
+	return style.Width(1).Height(height).Render(line)
+}
+
+// renderColumn creates a flat Lip Gloss column with a focus-aware rail and heading.
 func (a CharmApp) renderColumn(pane charmPane, title string, meta string, width int, height int, body string) string {
+	contentWidth := paneContentWidth(width)
 	titleLine := title
 	if strings.TrimSpace(meta) != "" {
 		metaText := a.styles.paneMeta.Render(meta)
-		spacer := strings.Repeat(" ", maxInt(1, width-lipgloss.Width(title)-lipgloss.Width(metaText)-1))
+		spacer := strings.Repeat(" ", maxInt(1, contentWidth-lipgloss.Width(title)-lipgloss.Width(metaText)-1))
 		titleLine = title + spacer + metaText
 	}
 	headerStyle := a.styles.paneHeader
 	if a.focusedPane == pane {
 		headerStyle = a.styles.paneHeaderFocused
 	}
-	header := headerStyle.Width(width).Render(titleLine)
-	return a.styles.column.Width(width).Height(height).Render(lipgloss.JoinVertical(lipgloss.Left, header, body))
+	header := headerStyle.Width(contentWidth).Render(titleLine)
+	content := a.styles.column.Width(contentWidth).Height(height).Render(lipgloss.JoinVertical(lipgloss.Left, header, body))
+	return lipgloss.JoinHorizontal(lipgloss.Top, a.renderPaneRail(pane, height), content)
 }
 
 // renderIssueTabs presents My/Other issue lists as tabs instead of nested boxes.
@@ -7994,6 +8017,8 @@ type charmStyles struct {
 	column                   lipgloss.Style
 	columnBody               lipgloss.Style
 	columnGap                lipgloss.Style
+	paneRail                 lipgloss.Style
+	paneRailFocused          lipgloss.Style
 	resizeHandle             lipgloss.Style
 	resizeHandleActive       lipgloss.Style
 	paneHeader               lipgloss.Style
@@ -8059,6 +8084,8 @@ func newCharmStyles(theme Theme) charmStyles {
 		column:                   lipgloss.NewStyle().Foreground(palette.fg),
 		columnBody:               lipgloss.NewStyle().Foreground(palette.fg),
 		columnGap:                lipgloss.NewStyle(),
+		paneRail:                 lipgloss.NewStyle().Foreground(palette.border),
+		paneRailFocused:          lipgloss.NewStyle().Foreground(palette.focus).Bold(true),
 		resizeHandle:             lipgloss.NewStyle().Foreground(palette.border),
 		resizeHandleActive:       lipgloss.NewStyle().Foreground(palette.focus).Bold(true),
 		paneHeader:               lipgloss.NewStyle().Foreground(palette.subtle).Bold(true).PaddingBottom(0),

@@ -127,6 +127,27 @@ func TestCharmAppMainLayoutAvoidsBackgroundBlocks(t *testing.T) {
 	}
 }
 
+func TestCharmAppFocusedPaneShowsFocusRail(t *testing.T) {
+	app := NewCharmApp(&linearapi.Client{}, testCharmConfig(), nil)
+	model, _ := app.Update(tea.WindowSizeMsg{Width: 120, Height: 32})
+	app = model.(CharmApp)
+	app.focusedPane = charmPaneDetails
+
+	rendered := app.View().Content
+	plain := ansi.Strip(rendered)
+	if !strings.Contains(plain, "┃") {
+		t.Fatalf("focused pane rendered without a visible focus rail:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "38;2;94;106;210") {
+		t.Fatalf("focused pane rail missing Linear focus color:\n%s", rendered)
+	}
+	for _, legacy := range []string{"╭", "╮", "╰", "╯"} {
+		if strings.Contains(plain, legacy) {
+			t.Fatalf("focused pane rail brought back legacy panel border %q:\n%s", legacy, rendered)
+		}
+	}
+}
+
 func TestCharmAppCommandPaletteKeepsWorkspaceVisible(t *testing.T) {
 	app := NewCharmApp(&linearapi.Client{}, testCharmConfig(), nil)
 	model, _ := app.Update(tea.WindowSizeMsg{Width: 120, Height: 32})
