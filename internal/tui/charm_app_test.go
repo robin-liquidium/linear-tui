@@ -751,6 +751,31 @@ func TestCharmAppIssueRowsShowDueToday(t *testing.T) {
 	}
 }
 
+func TestCharmAppIssueRowsShowOverdueDatesInOrange(t *testing.T) {
+	app := NewCharmApp(&linearapi.Client{}, testCharmConfig(), nil)
+	overdue := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	app.setIssues([]linearapi.Issue{{
+		ID:         "issue-0",
+		Identifier: "LT-0",
+		Title:      "Selected normal issue",
+		State:      "Todo",
+		UpdatedAt:  time.Now(),
+	}, {
+		ID:         "issue-1",
+		Identifier: "LT-1",
+		Title:      "Handle yesterday",
+		State:      "Todo",
+		DueDate:    &overdue,
+		UpdatedAt:  time.Now(),
+	}}, "")
+	app.selectIssueByID("issue-0")
+
+	rendered := app.renderIssueTable(app.otherRows, app.otherIssueMap, app.otherTable)
+	if !strings.Contains(rendered, overdue) || !strings.Contains(rendered, "38;2;255;159;28") {
+		t.Fatalf("overdue row was not visibly highlighted orange:\n%s", rendered)
+	}
+}
+
 func TestCharmAppSelectedIssueRowSpansTableWidth(t *testing.T) {
 	app := NewCharmApp(&linearapi.Client{}, testCharmConfig(), nil)
 	model, _ := app.Update(tea.WindowSizeMsg{Width: 180, Height: 32})

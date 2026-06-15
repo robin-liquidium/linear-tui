@@ -6267,6 +6267,8 @@ func (a CharmApp) renderIssueTableRow(row IssueRow, issues map[string]*linearapi
 			Bold(true)
 	} else if isIssueDueToday(issue) {
 		style = a.styles.dueTodayRow
+	} else if isIssueOverdue(issue) {
+		style = a.styles.dueOverdueRow
 	}
 	rendered := make([]string, 0, len(columns))
 	for i, col := range columns {
@@ -6323,10 +6325,13 @@ func (a CharmApp) issueTableCells(row IssueRow, issue linearapi.Issue, selected 
 	}
 }
 
-// renderDueDate returns a compact due-date marker with an accent for today's work.
+// renderDueDate returns a compact due-date marker with stronger accents for urgent dates.
 func (a CharmApp) renderDueDate(dueDate *string) string {
 	if isDueDateToday(dueDate) {
 		return a.styles.dueToday.Render("Today")
+	}
+	if isDueDateOverdue(dueDate) {
+		return a.styles.dueOverdue.Render(plainDueDateLabel(dueDate))
 	}
 	return a.styles.subtle.Render(plainDueDateLabel(dueDate))
 }
@@ -6856,12 +6861,36 @@ func isIssueDueToday(issue *linearapi.Issue) bool {
 	return isDueDateToday(issue.DueDate)
 }
 
+// isIssueOverdue reports whether an issue has a due date before today's local date.
+func isIssueOverdue(issue *linearapi.Issue) bool {
+	if issue == nil {
+		return false
+	}
+	return isDueDateOverdue(issue.DueDate)
+}
+
 // isDueDateToday reports whether a Linear due-date string is today's local date.
 func isDueDateToday(dueDate *string) bool {
 	if dueDate == nil {
 		return false
 	}
 	return strings.TrimSpace(*dueDate) == todayLinearDate()
+}
+
+// isDueDateOverdue reports whether a Linear due-date string is before today's local date.
+func isDueDateOverdue(dueDate *string) bool {
+	if dueDate == nil {
+		return false
+	}
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(*dueDate))
+	if err != nil {
+		return false
+	}
+	today, err := time.Parse("2006-01-02", todayLinearDate())
+	if err != nil {
+		return false
+	}
+	return parsed.Before(today)
 }
 
 // cloneStringPointer returns an independent copy of an optional string.
@@ -7996,6 +8025,8 @@ type charmStyles struct {
 	priorityNone             lipgloss.Style
 	dueToday                 lipgloss.Style
 	dueTodayRow              lipgloss.Style
+	dueOverdue               lipgloss.Style
+	dueOverdueRow            lipgloss.Style
 	issueIdentifier          lipgloss.Style
 }
 
@@ -8059,6 +8090,8 @@ func newCharmStyles(theme Theme) charmStyles {
 		priorityNone:             lipgloss.NewStyle().Foreground(palette.subtle),
 		dueToday:                 lipgloss.NewStyle().Foreground(charmColor(theme.StatusInProgress)).Bold(true),
 		dueTodayRow:              lipgloss.NewStyle().Foreground(charmColor(theme.StatusInProgress)).Bold(true),
+		dueOverdue:               lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9f1c")).Bold(true),
+		dueOverdueRow:            lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9f1c")).Bold(true),
 		issueIdentifier:          lipgloss.NewStyle().Foreground(palette.focus).Bold(true),
 	}
 }

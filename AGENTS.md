@@ -1,5 +1,8 @@
 # Repository Guidelines
 
+## Parent Rules
+- Before changing this repo, read and follow `../AGENTS.md` when it exists. These repo-local notes extend those shared TUI rules.
+
 ## Stack
 - This TUI is the Charm rewrite. Use Bubble Tea, Bubbles, Lip Gloss, and Glamour; do not reintroduce tview/tcell patterns.
 - Docs: [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubble Tea commands](https://charm.land/blog/commands-in-bubbletea/), [Bubbles](https://github.com/charmbracelet/bubbles), [Lip Gloss](https://github.com/charmbracelet/lipgloss), [Glamour](https://github.com/charmbracelet/glamour).
